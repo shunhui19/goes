@@ -5,6 +5,9 @@ package lib
 import (
 	"fmt"
 	"os"
+	"runtime"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -90,6 +93,7 @@ func Fatal(format string, a ...interface{}) {
 func outPrint(msg string, level int) {
 	logHead := "[" + time.Now().Format("2006-01-02 15:04:05.000") + "]"
 	logHead += "[" + levelTagMap[level] + "] "
+	logHead += callName(0) + " "
 	fmt.Println(logHead + msg)
 }
 
@@ -121,4 +125,13 @@ func (l *Log) Panic(format string, a ...interface{}) {
 func (l *Log) Fatal(format string, a ...interface{}) {
 	outPrint(fmt.Sprintf(format, a...), FatalLevel)
 	os.Exit(1)
+}
+
+// callStack get call information with file, line, function.
+func callName(skip int) string {
+	_, file, line, ok := runtime.Caller(skip + 1)
+	if !ok {
+		return ""
+	}
+	return file[strings.LastIndex(file, "/src/")+5:] + ":" + strconv.Itoa(line)
 }

@@ -3,6 +3,9 @@ package goes
 import (
 	"goes/lib"
 	"net"
+	"os"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -19,7 +22,7 @@ const (
 	StatusReloading = 8
 )
 
-// build-in protocols.
+// buildInTransports Go build-in transports protocols.
 var buildInTransports = []map[string]string{
 	{"tcp": "tcp"},
 	{"tcp4": "tcp4"},
@@ -53,6 +56,8 @@ type Goer struct {
 	mainSocket net.Listener
 	// socketName socket name, the format is like this http://127.0.0.1:8080
 	socketName string
+	// rootPath root path.
+	rootPath string
 	// OnConnect emitted when a socket connection is successfully established.
 	OnConnect func()
 	// OnMessage emitted when data is received.
@@ -96,7 +101,13 @@ func (g *Goer) checkEnv() {
 
 // init.
 func (g *Goer) init() {
+	// check transport layer protocol.
+	if g.Transport == "" {
+		g.Transport = "tcp"
+	}
 
+	// get root path
+	g.rootPath, _ = os.Getwd()
 }
 
 // parseCommand parse command.
@@ -111,7 +122,7 @@ func (g *Goer) daemon() {
 
 // initWorkers init all worker instances.
 func (g *Goer) initWorkers() {
-
+	g.listen()
 }
 
 // saveMainPid save pid.
@@ -139,10 +150,61 @@ func (g *Goer) installSignal() {
 
 }
 
+// listen create a listen socket.
+func (g *Goer) listen() {
+	if g.socketName == "" {
+		return
+	}
+
+	if g.mainSocket == nil {
+		checkScheme := false
+		// get the application layer communication protocol and listening address.
+		schemes := strings.SplitN(g.socketName, ":", 2)
+		// check application layer protocol class.
+		for _, v := range buildInTransports {
+			if v[schemes[0]] == schemes[0] {
+				checkScheme = true
+				break
+			}
+		}
+		if !checkScheme {
+			// then adjustment is based on the existence of struct, here temporarily judge based on the existence of file.
+			//scheme := lib.UcFirst(schemes[0])
+			_, err := os.Stat(g.rootPath + strconv.Itoa(os.PathSeparator) + schemes[0])
+			if err != nil {
+				if !os.IsExist(err) {
+					lib.Fatal("unsupported protocol: %v", schemes[0])
+				}
+			}
+		} else {
+			g.Transport = schemes[0]
+		}
+
+		switch g.Transport {
+		case "tcp", "tcp4", "tcp6", "unix", "unixpacket", "ssl":
+			listener, err := net.Listen(g.Transport, strings.TrimLeft(schemes[1], "//"))
+			if err != nil {
+				lib.Fatal(err.Error())
+			}
+			g.mainSocket = listener
+		case "udp", "upd4", "udp6", "unixgram":
+			_, err := net.ListenPacket(g.Transport, strings.TrimLeft(schemes[1], "//"))
+			if err != nil {
+				lib.Fatal(err.Error())
+			}
+		default:
+			lib.Fatal("unknown transport layer protocol")
+		}
+
+		lib.Info("server start success...")
+	}
+}
+
 // NewGoer create object of Goer with socketName.
 func NewGoer(socketName string) *Goer {
 	if socketName == "" {
 		lib.Fatal("the socket address can not be empty")
 	}
+
 	return &Goer{socketName: socketName}
 }

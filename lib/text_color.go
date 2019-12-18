@@ -1,8 +1,9 @@
-// the library of text color
+// the library of text color, set the color to text tag of message.
 package lib
 
 import "fmt"
 
+// number value constant of color.
 const (
 	TextBlack = iota + 30
 	TextRed
@@ -14,36 +15,47 @@ const (
 	TextWhite
 )
 
+// Black color of black.
 func Black(str string) string {
 	return textColor(TextBlack, str)
 }
 
+// Red color of Red, usually use in the type of error, fatal message.
 func Red(str string) string {
 	return textColor(TextRed, str)
 }
 
+// Green color of Green.
 func Green(str string) string {
 	return textColor(TextGreen, str)
 }
 
+// Yellow color of Yellow.
 func Yellow(str string) string {
 	return textColor(TextYellow, str)
 }
 
+// Blue color of Blue.
 func Blue(str string) string {
 	return textColor(TextBlue, str)
 }
 
+// Magenta color of Magenta.
 func Magenta(str string) string {
 	return textColor(TextMagenta, str)
 }
+
+// Cyan color of Cyan.
 func Cyan(str string) string {
 	return textColor(TextCyan, str)
 }
+
+// White color of White.
 func White(str string) string {
 	return textColor(TextWhite, str)
 }
 
+// textColor set color of message tag.
 func textColor(color int, str string) string {
 	//var TextColor = []int{TextBlack, TextRed, TextGreen, TextYellow, TextBlue, TextCyan, TextWhite}
 	//for _, v := range TextColor {

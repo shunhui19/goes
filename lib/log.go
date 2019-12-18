@@ -93,7 +93,7 @@ func Fatal(format string, a ...interface{}) {
 func outPrint(msg string, level int) {
 	logHead := "[" + time.Now().Format("2006-01-02 15:04:05.000") + "]"
 	logHead += "[" + levelTagMap[level] + "] "
-	logHead += callName(0) + " "
+	logHead += callName(2) + " "
 	fmt.Println(logHead + msg)
 }
 
@@ -129,9 +129,10 @@ func (l *Log) Fatal(format string, a ...interface{}) {
 
 // callStack get call information with file, line, function.
 func callName(skip int) string {
-	_, file, line, ok := runtime.Caller(skip + 1)
+	pc, file, line, ok := runtime.Caller(skip + 1)
 	if !ok {
 		return ""
 	}
-	return file[strings.LastIndex(file, "/src/")+5:] + ":" + strconv.Itoa(line)
+	name := runtime.FuncForPC(pc).Name()
+	return file[strings.LastIndex(file, "/src/")+5:] + ":" + strconv.Itoa(line) + " [" + name + "]"
 }

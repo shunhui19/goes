@@ -59,42 +59,46 @@ type Logger interface {
 
 // Info log the type of info message.
 func Info(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), InfoLevel)
+	outPrint(fmt.Sprintf(format, a...), InfoLevel, false)
 }
 
 // Debug log the type of Debug message.
 func Debug(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), DebugLevel)
+	outPrint(fmt.Sprintf(format, a...), DebugLevel, false)
 }
 
 // Warn log the type of warn message.
 func Warn(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), WarnLevel)
+	outPrint(fmt.Sprintf(format, a...), WarnLevel, false)
 }
 
 // Error log the type of error message.
 func Error(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), ErrorLevel)
+	outPrint(fmt.Sprintf(format, a...), ErrorLevel, true)
 }
 
 // Panic log a message and call panic.
 func Panic(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), ErrorLevel)
+	outPrint(fmt.Sprintf(format, a...), ErrorLevel, true)
 	panic(fmt.Sprintf(format, a...))
 }
 
 // Fatal log a message and call os.Exit(1).
 func Fatal(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), FatalLevel)
+	outPrint(fmt.Sprintf(format, a...), FatalLevel, true)
 	os.Exit(1)
 }
 
 // outPrint echo content of message to Stdout.
-func outPrint(msg string, level int) {
+func outPrint(msg string, level int, showStacks bool) {
 	logHead := "[" + time.Now().Format("2006-01-02 15:04:05.000") + "]"
 	logHead += "[" + levelTagMap[level] + "] "
 	logHead += callName(2) + " "
-	fmt.Println(logHead + msg)
+	logHead += msg
+	if showStacks {
+		logHead += callStacks()
+	}
+	fmt.Println(logHead)
 }
 
 // Log struct of Log
@@ -102,28 +106,28 @@ type Log struct {
 }
 
 func (l *Log) Info(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), InfoLevel)
+	outPrint(fmt.Sprintf(format, a...), InfoLevel, false)
 }
 
 func (l *Log) Debug(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), DebugLevel)
+	outPrint(fmt.Sprintf(format, a...), DebugLevel, false)
 }
 
 func (l *Log) Warn(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), WarnLevel)
+	outPrint(fmt.Sprintf(format, a...), WarnLevel, false)
 }
 
 func (l *Log) Error(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), ErrorLevel)
+	outPrint(fmt.Sprintf(format, a...), ErrorLevel, true)
 }
 
 func (l *Log) Panic(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), PanicLevel)
+	outPrint(fmt.Sprintf(format, a...), PanicLevel, true)
 	panic(fmt.Sprintf(format, a...))
 }
 
 func (l *Log) Fatal(format string, a ...interface{}) {
-	outPrint(fmt.Sprintf(format, a...), FatalLevel)
+	outPrint(fmt.Sprintf(format, a...), FatalLevel, true)
 	os.Exit(1)
 }
 
@@ -135,4 +139,11 @@ func callName(skip int) string {
 	}
 	name := runtime.FuncForPC(pc).Name()
 	return file[strings.LastIndex(file, "/src/")+5:] + ":" + strconv.Itoa(line) + " [" + name + "]"
+}
+
+// callStacks get stacks information of current goroutine.
+func callStacks() string {
+	buf := make([]byte, 4096)
+	buf = buf[:runtime.Stack(buf, true)]
+	return fmt.Sprintf("\n=== BEGIN goroutine stack dump ===\n%s\n=== END goroutine stack dump ===", buf)
 }

@@ -1,7 +1,7 @@
 // connection interface.
 package connections
 
-type connectionInterface interface {
+type ConnectionInterface interface {
 	// Send sends data on the connection.
 	Send(data string)
 	// Close close connection.

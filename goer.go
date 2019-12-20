@@ -246,7 +246,7 @@ func (g *Goer) acceptTcpConnection() {
 		}
 
 		go func() {
-			defer connection.Close()
+			defer connection.Close("")
 			connection.Read()
 		}()
 	}

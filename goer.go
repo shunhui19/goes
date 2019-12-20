@@ -66,7 +66,7 @@ type Goer struct {
 	// OnConnect emitted when a socket connection is successfully established.
 	OnConnect func(connection *connections.TcpConnection)
 	// OnMessage emitted when data is received.
-	OnMessage func(connection *connections.TcpConnection, data string)
+	OnMessage func(connection *connections.TcpConnection, data []byte)
 	// OnClose emitted when other end of the socket sends a FIN packet.
 	OnClose func()
 	// OnError emitted when an error occurs with connection.

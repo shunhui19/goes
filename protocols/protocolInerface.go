@@ -6,7 +6,9 @@ type Protocol interface {
 	// Encode encode package before send to client.
 	Encode(data []byte) []byte
 	// Decode decode package and emit.
-	Decode(recvBuffer []byte) interface{}
+	Decode(recvBuffer []byte) []byte
 	// Input check the integrity of package.
-	Input(recvBuffer []byte) int
+	// if return the value of bool, close connection, indicates that the package is greater than MaxPackageSize,
+	// else if return 0, the package is not a integrity package, continue to receive.
+	Input(recvBuffer []byte) interface{}
 }

@@ -6,6 +6,8 @@ import (
 	"goes/protocols"
 	"math"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -65,6 +67,8 @@ type TcpConnection struct {
 	remoteAddress string
 	// recvBuffer receive buffer.
 	recvBuffer []byte
+	// sendBuffer send buffer.
+	sendBuffer []byte
 	// connections all connection instances, key is connection id and value is *net.Conn.
 	connections sync.Map
 	// status connection status.
@@ -83,38 +87,56 @@ func (t *TcpConnection) Send(data string) {
 }
 
 // Close close connection.
-func (t *TcpConnection) Close() {
-
+func (t *TcpConnection) Close(data string) {
+	if t.status == StatusClosing || t.status == StatusClosed {
+		return
+	} else {
+		if data != "" {
+			t.Send(data)
+		}
+		t.status = StatusClosing
+	}
+	t.destroy()
+	//if len(t.sendBuffer) == 0 {
+	//} else {
+	//
+	//}
 }
 
 // GetRemoteIp get remote ip.
 func (t *TcpConnection) GetRemoteIp() string {
-	return ""
+	return strings.Split(t.remoteAddress, ":")[0]
 }
 
 // GetRemotePort get remote port.
 func (t *TcpConnection) GetRemotePort() int {
+	if t.remoteAddress != "" {
+		port, _ := strconv.Atoi(strings.Split(t.remoteAddress, ":")[1])
+		return port
+	}
 	return 0
 }
 
 // GetRemoteAddress get remote address, the format is like this http://127.0.0.1:8080.
 func (t *TcpConnection) GetRemoteAddress() string {
-	return ""
+	return t.remoteAddress
 }
 
 // GetLocalIp get local ip.
 func (t *TcpConnection) GetLocalIp() string {
-	return ""
+	return strings.Split((*t.socket).LocalAddr().String(), ":")[0]
 }
 
 // GetLocalPort get local port.
 func (t *TcpConnection) GetLocalPort() int {
-	return 0
+	addr := strings.Split((*t.socket).LocalAddr().String(), ":")
+	port, _ := strconv.Atoi(addr[1])
+	return port
 }
 
 // GetLocalAddress get remote address, the format is like this http://127.0.0.1:8080.
 func (t *TcpConnection) GetLocalAddress() string {
-	return ""
+	return (*t.socket).LocalAddr().String()
 }
 
 // Read read data from socket.

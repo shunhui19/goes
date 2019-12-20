@@ -2,13 +2,11 @@
 // you can define custom protocol through implement three method.
 package protocols
 
-import "goes/connections"
-
 type Protocol interface {
 	// Encode encode package before send to client.
-	Encode(data string, connectionInterface connections.ConnectionInterface)
+	Encode(data []byte) []byte
 	// Decode decode package and emit.
-	Decode(recvBuffer string, connectionInterface connections.ConnectionInterface)
+	Decode(recvBuffer []byte) interface{}
 	// Input check the integrity of package.
-	Input(recvBuffer string, connectionInterface connections.ConnectionInterface) int
+	Input(recvBuffer []byte) int
 }

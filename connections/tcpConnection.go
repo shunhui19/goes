@@ -4,6 +4,7 @@ package connections
 import (
 	"goes/lib"
 	"goes/protocols"
+	"io"
 	"math"
 	"net"
 	"strconv"
@@ -148,7 +149,7 @@ func (t *TcpConnection) Read() {
 
 	for {
 		n, err := (*t.socket).Read(t.recvBuffer)
-		if err != nil {
+		if err != nil && err != io.EOF {
 			lib.Warn(err.Error())
 			return
 		}
@@ -214,12 +215,12 @@ func (t *TcpConnection) Read() {
 		// application protocol is not set.
 		t.baseConnection.TotalRequest++
 		if t.OnMessage == nil {
-			t.recvBuffer = t.recvBuffer[n:len(t.recvBuffer)]
+			t.recvBuffer = t.recvBuffer[t.byteRead:len(t.recvBuffer)]
 			t.byteRead = 0
 			return
 		}
-		t.OnMessage(t, string(t.recvBuffer[t.byteRead:len(t.recvBuffer)]))
-		t.recvBuffer = t.recvBuffer[n:len(t.recvBuffer)]
+		t.OnMessage(t, string(t.recvBuffer[:t.byteRead]))
+		t.recvBuffer = t.recvBuffer[t.byteRead:len(t.recvBuffer)]
 	}
 }
 

@@ -1,11 +1,12 @@
 package goes
 
 import (
+	"goes/connections"
 	"goes/lib"
+	"goes/protocols"
 	"net"
 	"os"
-	"strconv"
-	"strings"
+	"sync"
 )
 
 const (
@@ -42,10 +43,12 @@ type Goer struct {
 	Reloadable bool
 	// ReusePort reuse port.
 	ReusePort bool
-	// Transport the protocol of layer.
+	// Transport the protocol of transport layer, if transport layer protocol is empty,
+	// the default protocol is tcp.
 	Transport string
-	// Protocol the protocol of application.
-	Protocol string
+	// Protocol the protocol of application layer, the type is interface of protocol,
+	// if no set, the default protocol is tcp.
+	Protocol protocols.Protocol
 	// Daemon daemon start.
 	Daemon bool
 	// LogFile log file.
@@ -58,10 +61,12 @@ type Goer struct {
 	socketName string
 	// rootPath root path.
 	rootPath string
+	// connections store all connections of client.
+	connections sync.Map
 	// OnConnect emitted when a socket connection is successfully established.
-	OnConnect func()
+	OnConnect func(connection *connections.TcpConnection)
 	// OnMessage emitted when data is received.
-	OnMessage func()
+	OnMessage func(connection *connections.TcpConnection, data string)
 	// OnClose emitted when other end of the socket sends a FIN packet.
 	OnClose func()
 	// OnError emitted when an error occurs with connection.
@@ -157,38 +162,40 @@ func (g *Goer) listen() {
 	}
 
 	if g.mainSocket == nil {
-		checkScheme := false
 		// get the application layer communication protocol and listening address.
-		schemes := strings.SplitN(g.socketName, ":", 2)
-		// check application layer protocol class.
-		for _, v := range buildInTransports {
-			if v[schemes[0]] == schemes[0] {
-				checkScheme = true
-				break
-			}
-		}
-		if !checkScheme {
-			// then adjustment is based on the existence of struct, here temporarily judge based on the existence of file.
-			//scheme := lib.UcFirst(schemes[0])
-			_, err := os.Stat(g.rootPath + strconv.Itoa(os.PathSeparator) + schemes[0])
-			if err != nil {
-				if !os.IsExist(err) {
-					lib.Fatal("unsupported protocol: %v", schemes[0])
-				}
-			}
-		} else {
-			g.Transport = schemes[0]
-		}
+		//schemes := strings.SplitN(g.socketName, ":", 2)
+		//// check application layer protocol.
+		//var (
+		//	scheme          string
+		//	ok, checkScheme bool
+		//)
+		//for _, transport := range buildInTransports {
+		//	if scheme, ok = transport[g.Transport]; ok {
+		//		checkScheme = true
+		//		break
+		//	}
+		//}
+		//// check application layer protocol.
+		//if !checkScheme {
+		//	_, err := os.Stat(g.rootPath + strconv.Itoa(os.PathSeparator) + schemes[0])
+		//	if err != nil {
+		//		if !os.IsExist(err) {
+		//			lib.Fatal("unsupported protocol: %v", schemes[0])
+		//		}
+		//	}
+		//} else {
+		//	g.Transport = scheme
+		//}
 
 		switch g.Transport {
 		case "tcp", "tcp4", "tcp6", "unix", "unixpacket", "ssl":
-			listener, err := net.Listen(g.Transport, strings.TrimLeft(schemes[1], "//"))
+			listener, err := net.Listen(g.Transport, g.socketName)
 			if err != nil {
 				lib.Fatal(err.Error())
 			}
 			g.mainSocket = listener
 		case "udp", "upd4", "udp6", "unixgram":
-			_, err := net.ListenPacket(g.Transport, strings.TrimLeft(schemes[1], "//"))
+			_, err := net.ListenPacket(g.Transport, g.socketName)
 			if err != nil {
 				lib.Fatal(err.Error())
 			}
@@ -197,14 +204,70 @@ func (g *Goer) listen() {
 		}
 
 		lib.Info("server start success...")
+
+		g.resumeAccept()
 	}
 }
 
-// NewGoer create object of Goer with socketName.
-func NewGoer(socketName string) *Goer {
+// resumeAccept accept new connections.
+func (g *Goer) resumeAccept() {
+	switch g.Transport {
+	case "tcp", "tcp4", "tcp6", "unix", "unixpacket", "ssl":
+		g.acceptTcpConnection()
+	case "udp", "upd4", "udp6", "unixgram":
+		g.acceptUdpConnection()
+	}
+}
+
+// acceptTcpConnection accept a tcp connection.
+func (g *Goer) acceptTcpConnection() {
+	for {
+		newSocket, err := g.mainSocket.Accept()
+		if err != nil {
+			lib.Error("unAccept client:%s socket, reason: %s", newSocket.RemoteAddr().String(), err.Error())
+			continue
+		}
+		connection := connections.NewTcpConnection(&newSocket, newSocket.RemoteAddr().String())
+		// store all client connection.
+		g.connections.Store(connection.Id, *connection)
+		//connection.Goer = g
+		connection.Transport = g.Transport
+		connection.Protocol = g.Protocol
+		connection.OnMessage = g.OnMessage
+		connection.OnClose = g.OnClose
+		connection.OnError = g.OnError
+		connection.OnBufferDrain = g.OnBufferDrain
+		connection.OnBuffFull = g.OnBufferFull
+
+		// trigger OnConnect if is set.
+		if g.OnConnect != nil {
+			lib.Info("OnConnect callback")
+			g.OnConnect(connection)
+		}
+
+		go func() {
+			defer connection.Close()
+			connection.Read()
+		}()
+	}
+}
+
+// acceptUdpConnection accept a udp package.
+func (g *Goer) acceptUdpConnection() {
+
+}
+
+// RemoveConnection delete connection from connections store.
+func (g *Goer) RemoveConnection(connectionId int) {
+	g.connections.Delete(connectionId)
+}
+
+// NewGoer create object of Goer with socketName, application layer protocol and transport layer protocol,
+// if applicationProtocol is empty.
+func NewGoer(socketName string, applicationProtocol protocols.Protocol, transportProtocol string) *Goer {
 	if socketName == "" {
 		lib.Fatal("the socket address can not be empty")
 	}
 
-	return &Goer{socketName: socketName}
+	return &Goer{socketName: socketName, Protocol: applicationProtocol, Transport: transportProtocol}
 }

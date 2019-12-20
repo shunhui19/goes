@@ -41,7 +41,7 @@ type TcpConnection struct {
 	// baseConnection.
 	baseConnection BaseConnection
 	// OnMessage emitted when data is received.
-	OnMessage func(connection *TcpConnection, data string)
+	OnMessage func(connection *TcpConnection, data []byte)
 	// OnError emitted when a error occurs with connection.
 	OnError func()
 	// OnClose emitted when the other end of the socket send a FIN package.
@@ -148,6 +148,7 @@ func (t *TcpConnection) Read() {
 	}
 
 	for {
+	READ:
 		n, err := (*t.socket).Read(t.recvBuffer)
 		if err != nil && err != io.EOF {
 			lib.Warn(err.Error())
@@ -174,7 +175,17 @@ func (t *TcpConnection) Read() {
 					}
 				} else {
 					// get length of package from protocol interface.
-					t.currentPackageLength = t.Protocol.Input(t.recvBuffer[:t.byteRead])
+					input := t.Protocol.Input(t.recvBuffer[:t.byteRead])
+					switch input.(type) {
+					case int:
+						t.currentPackageLength = input.(int)
+					case bool:
+						if input == false {
+							t.Close("")
+							return
+						}
+					default:
+					}
 
 					// the package length is unknown.
 					if t.currentPackageLength == 0 {
@@ -200,11 +211,12 @@ func (t *TcpConnection) Read() {
 				// reset the current package length.
 				t.byteRead, t.currentPackageLength = 0, 0
 				if t.OnMessage == nil {
-					return
+					goto READ
 				}
 
 				// decode request buffer before emitted OnMessage func.
-				t.OnMessage(t, t.Protocol.Decode(oneRequestBuffer).(string))
+				t.OnMessage(t, t.Protocol.Decode(oneRequestBuffer))
+				goto READ
 			}
 		}
 
@@ -219,7 +231,7 @@ func (t *TcpConnection) Read() {
 			t.byteRead = 0
 			return
 		}
-		t.OnMessage(t, string(t.recvBuffer[:t.byteRead]))
+		t.OnMessage(t, t.recvBuffer[:t.byteRead])
 		t.recvBuffer = t.recvBuffer[t.byteRead:len(t.recvBuffer)]
 	}
 }

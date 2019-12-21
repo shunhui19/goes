@@ -149,7 +149,14 @@ func (t *TcpConnection) Read() {
 
 	for {
 	READ:
-		n, err := (*t.socket).Read(t.recvBuffer)
+		// determine the size of receive buf in every package.
+		//err := binary.Read(*t.socket, binary.BigEndian, &size)
+		//if err != nil {
+		//	lib.Warn("determine the size error: %v", err.Error())
+		//}
+		buf := make([]byte, 1024)
+
+		n, err := (*t.socket).Read(buf)
 		if err != nil && err != io.EOF {
 			lib.Warn(err.Error())
 			return
@@ -161,21 +168,21 @@ func (t *TcpConnection) Read() {
 			return
 		} else {
 			t.byteRead += n
+			t.recvBuffer = append(t.recvBuffer, buf[:n]...)
 		}
 
 		// if the application layer protocol has been set up.
 		if t.Protocol != nil {
-			//parser := t.Protocol
-			for t.byteRead > 0 {
+			for len(t.recvBuffer) > 0 {
 				// the current packet length is known.
 				if t.currentPackageLength > 0 {
 					// data is not enough for a package.
 					if t.currentPackageLength > t.byteRead {
-						break
+						goto READ
 					}
 				} else {
 					// get length of package from protocol interface.
-					input := t.Protocol.Input(t.recvBuffer[:t.byteRead])
+					input := t.Protocol.Input(t.recvBuffer)
 					switch input.(type) {
 					case int:
 						t.currentPackageLength = input.(int)
@@ -189,11 +196,11 @@ func (t *TcpConnection) Read() {
 
 					// the package length is unknown.
 					if t.currentPackageLength == 0 {
-						break
+						goto READ
 					} else if t.currentPackageLength > 0 && t.currentPackageLength < MaxPackageSize {
 						// data is not enough for a package.
 						if t.currentPackageLength > t.byteRead {
-							break
+							goto READ
 						}
 					} else {
 						lib.Warn("error package. package_length=%d", t.currentPackageLength)
@@ -205,34 +212,33 @@ func (t *TcpConnection) Read() {
 				// the data is enough for a package.
 				t.baseConnection.TotalRequest++
 				// get a full package from the buffer.
-				oneRequestBuffer := t.recvBuffer[:t.byteRead]
+				oneRequestBuffer := t.recvBuffer[:t.currentPackageLength]
 				// remove the current package from the receive buffer.
-				t.recvBuffer = t.recvBuffer[t.byteRead:len(t.recvBuffer)]
+				t.recvBuffer = t.recvBuffer[t.currentPackageLength:]
 				// reset the current package length.
-				t.byteRead, t.currentPackageLength = 0, 0
+				t.currentPackageLength = 0
 				if t.OnMessage == nil {
-					goto READ
+					continue
 				}
 
 				// decode request buffer before emitted OnMessage func.
 				t.OnMessage(t, t.Protocol.Decode(oneRequestBuffer))
-				goto READ
 			}
 		}
 
-		//if t.byteRead == 0 {
-		//
-		//}
+		if len(t.recvBuffer) == 0 {
+			continue
+		}
 
 		// application protocol is not set.
 		t.baseConnection.TotalRequest++
 		if t.OnMessage == nil {
-			t.recvBuffer = t.recvBuffer[t.byteRead:len(t.recvBuffer)]
+			t.recvBuffer = t.recvBuffer[:0]
 			t.byteRead = 0
-			return
+			continue
 		}
-		t.OnMessage(t, t.recvBuffer[:t.byteRead])
-		t.recvBuffer = t.recvBuffer[t.byteRead:len(t.recvBuffer)]
+		t.OnMessage(t, t.recvBuffer)
+		t.recvBuffer = t.recvBuffer[:0]
 	}
 }
 
@@ -277,7 +283,7 @@ func NewTcpConnection(socket *net.Conn, remoteAddress string) *TcpConnection {
 	tcp.socket = socket
 	tcp.MaxSendBufferSize = DefaultMaxSendBufferSize
 	tcp.MaxPackageSize = DefaultMaxPackageSize
-	tcp.recvBuffer = make([]byte, ReadBufferSize)
+	tcp.recvBuffer = make([]byte, 0, ReadBufferSize)
 	tcp.status = StatusEstablished
 	tcp.remoteAddress = remoteAddress
 	//tcp.connections.Store(tcp.Id, tcp)

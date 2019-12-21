@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"goes"
 	"goes/connections"
+	"goes/protocols"
 )
 
 func main() {
-	goer := goes.NewGoer("127.0.0.1:8080", nil, "")
+	goer := goes.NewGoer("127.0.0.1:8080", protocols.NewTextProtocol(), "")
 	goer.OnConnect = func(connection *connections.TcpConnection) {
 		fmt.Printf("remoteAddress: %s\n", connection.GetRemoteAddress())
 		fmt.Printf("remoteIp: %s\n", connection.GetRemoteIp())
@@ -18,8 +19,8 @@ func main() {
 		fmt.Printf("localPort: %d\n", connection.GetLocalPort())
 	}
 
-	goer.OnMessage = func(connection *connections.TcpConnection, data string) {
-		fmt.Println(data, "1111")
+	goer.OnMessage = func(connection *connections.TcpConnection, data []byte) {
+		fmt.Println(string(data))
 	}
 
 	goer.OnClose = func() {

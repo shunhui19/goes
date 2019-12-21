@@ -15,8 +15,8 @@ func main() {
 		log.Fatal(err)
 	}
 	rand.Seed(time.Now().Unix())
-	for i := 0; i < 5; i++ {
-		n, err := conn.Write([]byte("hello" + strconv.Itoa(i)))
+	for i := 0; i < 10; i++ {
+		n, err := conn.Write([]byte("hello" + strconv.Itoa(i) + "\n"))
 		if err != nil {
 			log.Fatal(err)
 		}

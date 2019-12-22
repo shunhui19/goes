@@ -235,6 +235,16 @@ func (t *TcpConnection) GetLocalAddress() string {
 	return (*t.socket).LocalAddr().String()
 }
 
+// GetSendBufferQueueSize get send buffer queue size.
+func (t *TcpConnection) GetSendBufferQueueSize() int {
+	return len(t.sendBuffer)
+}
+
+// GetRecvBufferQueueSize get recv buffer queue size.
+func (t *TcpConnection) GetRecvBufferQueueSize() int {
+	return len(t.recvBuffer)
+}
+
 // Read read data from socket.
 func (t *TcpConnection) Read() {
 	// ssl handle.

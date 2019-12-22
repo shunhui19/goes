@@ -43,7 +43,7 @@ type TcpConnection struct {
 	// OnMessage emitted when data is received.
 	OnMessage func(connection *TcpConnection, data []byte)
 	// OnError emitted when a error occurs with connection.
-	OnError func()
+	OnError func(code int, msg string)
 	// OnClose emitted when the other end of the socket send a FIN package.
 	OnClose func()
 	// OnBuffFull emitted when the send buffer becomes full.
@@ -78,13 +78,108 @@ type TcpConnection struct {
 	//Goer *goes.Goer
 	// byteRead bytes read.
 	byteRead int
+	// byteWrite bytes written.
+	byteWrite int
 	// currentPackageLength current package length.
 	currentPackageLength int
 }
 
 // Send send data on the connection.
-func (t *TcpConnection) Send(data string) {
+// if connection is closing or closed, return.
+// if connection have not been established, then save encode data info application send buffer,
+// otherwise direct send encode of data into system socket send buffer.
+//
+// return value.
+// if return true, indicate the message already send to operating system layer socket send buffer.
+// else return false, send fail.
+// return nil indicate the message already send to application send buffer, waiting for into operating system socket send buffer.
+func (t *TcpConnection) Send(buffer string, raw bool) interface{} {
+	if t.status == StatusClosing || t.status == StatusClosed {
+		return false
+	}
 
+	// try to call protocol::encode(send_buffer) before sending into the application send buffer.
+	if raw == false && t.Protocol != nil {
+		buffer := t.Protocol.Encode([]byte(buffer))
+		if len(buffer) == 0 {
+			return nil
+		}
+	}
+
+	// when the connection have not been established, save encode data into send buffer.
+	if t.status != StatusEstablished {
+		if len(t.sendBuffer) > 0 && t.bufferIsFull() {
+			t.baseConnection.SendFail++
+			return false
+		}
+		// the encode of data into application send buffer.
+		t.sendBuffer = append(t.sendBuffer, []byte(buffer)...)
+		t.checkBufferWillFull()
+		return nil
+	}
+
+	// when the connection is established, send data directed.
+	if len(t.sendBuffer) == 0 {
+		n, err := (*t.socket).Write([]byte(buffer))
+		if err != nil {
+			lib.Warn("send data error: %v", err.Error())
+			return false
+		}
+		// send success.
+		if n == len(buffer) {
+			t.byteWrite += n
+			return true
+		}
+		// send only part of the data.
+		if n > 0 {
+			t.sendBuffer = []byte(buffer[n:])
+			t.byteWrite += n
+		} else {
+			// connection whether is closed.
+			if t.socket == nil {
+				t.baseConnection.SendFail++
+				if t.OnError != nil {
+					t.OnError(2, "client closed!")
+				}
+				t.destroy()
+				return false
+			}
+			// the fail of data send again.
+			t.sendBuffer = []byte(buffer)
+			t.checkBufferWillFull()
+			t.write()
+			return nil
+		}
+	} else {
+		if t.bufferIsFull() {
+			t.baseConnection.SendFail++
+			return false
+		}
+		t.sendBuffer = append(t.sendBuffer, []byte(buffer)...)
+		t.checkBufferWillFull()
+	}
+	return nil
+}
+
+// bufferIsFull whether send buffer is full.
+func (t *TcpConnection) bufferIsFull() bool {
+	if len(t.sendBuffer) >= MaxSendBufferSize {
+		if t.OnError != nil {
+			lib.Warn("code: %d, msg: %s", 2, "send buffer full and drop package")
+			t.OnError(2, "msg:send buffer full and drop package")
+		}
+		return true
+	}
+	return false
+}
+
+// checkBufferWillFull check whether the send buffer will be full.
+func (t *TcpConnection) checkBufferWillFull() {
+	if len(t.sendBuffer) >= MaxSendBufferSize {
+		if t.OnBuffFull != nil {
+			t.OnBuffFull()
+		}
+	}
 }
 
 // Close close connection.
@@ -93,7 +188,7 @@ func (t *TcpConnection) Close(data string) {
 		return
 	} else {
 		if data != "" {
-			t.Send(data)
+			t.Send(data, false)
 		}
 		t.status = StatusClosing
 	}
@@ -239,6 +334,30 @@ func (t *TcpConnection) Read() {
 		}
 		t.OnMessage(t, t.recvBuffer)
 		t.recvBuffer = t.recvBuffer[:0]
+	}
+}
+
+// write write data into socket.
+func (t *TcpConnection) write() {
+	n, _ := (*t.socket).Write(t.sendBuffer)
+	if n == len(t.sendBuffer) {
+		t.byteWrite += n
+		t.sendBuffer = t.sendBuffer[:0]
+		if t.OnBufferDrain != nil {
+			t.OnBufferDrain()
+		}
+		if t.status == StatusClosing {
+			t.destroy()
+		}
+		return
+	}
+
+	if n > 0 {
+		t.byteWrite += n
+		t.sendBuffer = t.sendBuffer[n:]
+	} else {
+		t.baseConnection.SendFail++
+		t.destroy()
 	}
 }
 

@@ -70,7 +70,7 @@ type Goer struct {
 	// OnClose emitted when other end of the socket sends a FIN packet.
 	OnClose func()
 	// OnError emitted when an error occurs with connection.
-	OnError func()
+	OnError func(code int, msg string)
 	// OnBufferFull emitted when the send buffer becomes full.
 	OnBufferFull func()
 	// OnBufferDrain emitted when the send buffer is empty.

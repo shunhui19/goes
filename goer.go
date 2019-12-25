@@ -12,6 +12,8 @@ import (
 const (
 	// Version the version of goes.
 	Version = 0.1
+	// MaxUdpPackageSize max udp package size.
+	MaxUdpPackageSize = 65536
 
 	// Status the status of starting.
 	StatusStarting = 1
@@ -56,7 +58,7 @@ type Goer struct {
 	// GracefulStop graceful stop or not.
 	gracefulStop bool
 	// mainSocket listening socket.
-	mainSocket net.Listener
+	mainSocket interface{}
 	// socketName socket name, the format is like this http://127.0.0.1:8080
 	socketName string
 	// rootPath root path.
@@ -64,9 +66,9 @@ type Goer struct {
 	// connections store all connections of client.
 	connections sync.Map
 	// OnConnect emitted when a socket connection is successfully established.
-	OnConnect func(connection *connections.TcpConnection)
+	OnConnect func(connection connections.ConnectionInterface)
 	// OnMessage emitted when data is received.
-	OnMessage func(connection *connections.TcpConnection, data []byte)
+	OnMessage func(connection connections.ConnectionInterface, data []byte)
 	// OnClose emitted when other end of the socket sends a FIN packet.
 	OnClose func()
 	// OnError emitted when an error occurs with connection.
@@ -162,31 +164,6 @@ func (g *Goer) listen() {
 	}
 
 	if g.mainSocket == nil {
-		// get the application layer communication protocol and listening address.
-		//schemes := strings.SplitN(g.socketName, ":", 2)
-		//// check application layer protocol.
-		//var (
-		//	scheme          string
-		//	ok, checkScheme bool
-		//)
-		//for _, transport := range buildInTransports {
-		//	if scheme, ok = transport[g.Transport]; ok {
-		//		checkScheme = true
-		//		break
-		//	}
-		//}
-		//// check application layer protocol.
-		//if !checkScheme {
-		//	_, err := os.Stat(g.rootPath + strconv.Itoa(os.PathSeparator) + schemes[0])
-		//	if err != nil {
-		//		if !os.IsExist(err) {
-		//			lib.Fatal("unsupported protocol: %v", schemes[0])
-		//		}
-		//	}
-		//} else {
-		//	g.Transport = scheme
-		//}
-
 		switch g.Transport {
 		case "tcp", "tcp4", "tcp6", "unix", "unixpacket", "ssl":
 			listener, err := net.Listen(g.Transport, g.socketName)
@@ -195,10 +172,11 @@ func (g *Goer) listen() {
 			}
 			g.mainSocket = listener
 		case "udp", "upd4", "udp6", "unixgram":
-			_, err := net.ListenPacket(g.Transport, g.socketName)
+			listener, err := net.ListenPacket(g.Transport, g.socketName)
 			if err != nil {
 				lib.Fatal(err.Error())
 			}
+			g.mainSocket = listener
 		default:
 			lib.Fatal("unknown transport layer protocol")
 		}
@@ -222,7 +200,7 @@ func (g *Goer) resumeAccept() {
 // acceptTcpConnection accept a tcp connection.
 func (g *Goer) acceptTcpConnection() {
 	for {
-		newSocket, err := g.mainSocket.Accept()
+		newSocket, err := g.mainSocket.(net.Listener).Accept()
 		if err != nil {
 			lib.Error("unAccept client:%s socket, reason: %s", newSocket.RemoteAddr().String(), err.Error())
 			continue
@@ -254,7 +232,42 @@ func (g *Goer) acceptTcpConnection() {
 
 // acceptUdpConnection accept a udp package.
 func (g *Goer) acceptUdpConnection() {
-
+	for {
+		recvBuffer := make([]byte, MaxUdpPackageSize)
+		n, addr, err := g.mainSocket.(net.PacketConn).ReadFrom(recvBuffer)
+		if err != nil {
+			lib.Warn("ReadFrom the %d data of udp error: %v", n, err)
+			return
+		}
+		go func() {
+			connection := connections.NewUdpConnection(g.mainSocket.(net.PacketConn), addr)
+			connection.Protocol = g.Protocol
+			if g.OnMessage != nil {
+				if g.Protocol != nil {
+					if n > 0 {
+						input := g.Protocol.Input(recvBuffer)
+						switch input.(type) {
+						case int:
+							if input.(int) == 0 {
+								return
+							}
+							packet := recvBuffer[:input.(int)]
+							recvBuffer = recvBuffer[input.(int):]
+							data := g.Protocol.Decode(packet)
+							g.OnMessage(connection, data)
+						case bool:
+							if input.(bool) == false {
+								return
+							}
+						}
+					}
+				} else {
+					g.OnMessage(connection, recvBuffer[:n])
+				}
+				connection.AddRequestCount()
+			}
+		}()
+	}
 }
 
 // RemoveConnection delete connection from connections store.

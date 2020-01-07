@@ -219,7 +219,6 @@ func (g *Goer) acceptTcpConnection() {
 
 		// trigger OnConnect if is set.
 		if g.OnConnect != nil {
-			lib.Info("OnConnect callback")
 			g.OnConnect(connection)
 		}
 

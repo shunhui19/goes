@@ -100,7 +100,7 @@ func (t *TcpConnection) Send(buffer string, raw bool) interface{} {
 
 	// try to call protocol::encode(send_buffer) before sending into the application send buffer.
 	if raw == false && t.Protocol != nil {
-		buffer := t.Protocol.Encode([]byte(buffer))
+		buffer = string(t.Protocol.Encode([]byte(buffer)))
 		if len(buffer) == 0 {
 			return nil
 		}
@@ -264,6 +264,7 @@ func (t *TcpConnection) Read() {
 		n, err := (*t.socket).Read(buf)
 		if err != nil && err != io.EOF {
 			lib.Warn(err.Error())
+			t.Close("server close client")
 			return
 		}
 

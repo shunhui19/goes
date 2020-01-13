@@ -21,12 +21,13 @@ func main() {
 	//}
 
 	goer.OnConnect = func(connection connections.ConnectionInterface) {
+		//fmt.Println("new connection is coming")
 		//connection.Send("hello, world", false)
 	}
 
 	goer.OnMessage = func(connection connections.ConnectionInterface, data []byte) {
-		fmt.Println("Receive:", len(string(data)))
-		//connection.Send(string(data), false)
+		fmt.Printf("Receive: %s\n", string(data))
+		connection.Send(string(data), false)
 		//connection.Send(fmt.Sprintf("the client send message is %v", string(data)), false)
 		//fmt.Println(status)
 	}

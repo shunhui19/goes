@@ -3,54 +3,56 @@ package main
 import (
 	"fmt"
 	"log"
-	"math/rand"
 	"net"
-	"strconv"
 	"sync"
-	"time"
 )
 
 func main() {
-	var w sync.WaitGroup
-	clientCount := 50
-	sendCount := 5
-	for i := 0; i < clientCount; i++ {
-		w.Add(1)
+	var wg sync.WaitGroup
+	for i := 0; i < 500; i++ {
+		wg.Add(1)
 		go func(i int) {
-			defer w.Done()
+			defer wg.Done()
+			var w sync.WaitGroup
 			conn, err := net.Dial("tcp", "127.0.0.1:8080")
 			if err != nil {
 				log.Fatal(err)
 			}
 			defer conn.Close()
 
-			// receive
-			//go func() {
-			//	buf := make([]byte, 1024)
-			//	for {
-			//		n, err := conn.Read(buf)
-			//		if err != nil {
-			//			log.Fatal(err.Error())
-			//		}
-			//		//fmt.Println(bytes.Contains(buf[:n], []byte("\n")))
-			//		fmt.Println(string(buf[:n]))
-			//	}
-			//}()
+			w.Add(1)
+			go receive(conn, &w)
 
-			rand.Seed(time.Now().Unix())
-			for j := 0; j < sendCount; j++ {
-				n, err := conn.Write([]byte(fmt.Sprintf("[goroutine-%d]", i) + "hello" + strconv.Itoa(j) + "\n"))
-				if err != nil {
-					log.Fatal(err)
-				}
-				fmt.Printf("success send %v byte\n", n)
-				//time.Sleep(time.Duration(rand.Int31n(5)) * time.Second)
+			// 每个连接送数据
+			for j := 0; j < 100000; j++ {
+				send(conn, []byte(fmt.Sprintf("[%d]%d-hello\n", i, j)))
 			}
 
-			// 保持客户端收到服务端数据之前不关闭连接
-			//time.Sleep(5 * time.Second)
+			w.Wait()
 		}(i)
 	}
+	wg.Wait()
+}
 
-	w.Wait()
+func receive(conn net.Conn, wg *sync.WaitGroup) {
+	defer wg.Done()
+	buf := make([]byte, 1024)
+	receivedCount := 0
+	for {
+		n, err := conn.Read(buf)
+		if err != nil {
+			log.Printf("client received error: %v\n", err)
+			continue
+		}
+		receivedCount++
+		fmt.Printf("The %d received, content: %v", receivedCount, string(buf[:n]))
+	}
+}
+
+func send(conn net.Conn, data []byte) {
+	_, err := conn.Write(data)
+	if err != nil {
+		log.Fatal(err)
+	}
+	//fmt.Printf("Send %v bytes\n", n)
 }

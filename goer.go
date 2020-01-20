@@ -53,6 +53,8 @@ type Goer struct {
 	Protocol protocols.Protocol
 	// Daemon daemon start.
 	Daemon bool
+	// StdoutFile stdout file.
+	StdoutFile string
 	// LogFile log file.
 	LogFile string
 	// GracefulStop graceful stop or not.
@@ -93,11 +95,11 @@ func (g *Goer) RunAll() {
 	g.init()
 	g.parseCommand()
 	g.daemon()
+	g.resetStd()
 	g.initWorkers()
 	g.installSignal()
 	g.saveMainPid()
 	g.displayUI()
-	g.resetStd()
 	g.monitorWorkers()
 }
 
@@ -113,8 +115,13 @@ func (g *Goer) init() {
 		g.Transport = "tcp"
 	}
 
-	// get root path
+	// get root path.
 	g.rootPath, _ = os.Getwd()
+
+	// default stdoutFile
+	if g.StdoutFile == "" {
+		g.StdoutFile = "/dev/null"
+	}
 }
 
 // parseCommand parse command.
@@ -144,7 +151,16 @@ func (g *Goer) displayUI() {
 
 // resetStd redirect standard input and output.
 func (g *Goer) resetStd() {
+	if !g.Daemon {
+		return
+	}
 
+	handle, err := os.OpenFile(g.StdoutFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND|os.O_SYNC, 0644)
+	if err != nil {
+		lib.Fatal("can not open StdoutFile: %v", g.StdoutFile)
+	}
+	os.Stdout = handle
+	os.Stderr = handle
 }
 
 // monitorWorkers monitor all child goroutine.

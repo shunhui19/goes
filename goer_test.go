@@ -13,13 +13,14 @@ func TestNewGoer(t *testing.T) {
 		socketName          string
 		applicationProtocol protocols.Protocol
 		transportProtocol   string
+		daemon              bool
 	}
 	tests := []struct {
 		name string
 		args args
 	}{
-		{name: "goer-tcp", args: args{"127.0.0.1:8081", nil, "tcp"}},
-		{name: "goer-tcp4", args: args{"127.0.0.1:8082", nil, "tcp4"}},
+		{name: "goer-tcp", args: args{"127.0.0.1:8081", nil, "tcp", true}},
+		{name: "goer-tcp4", args: args{"127.0.0.1:8082", nil, "tcp4", false}},
 		//{name: "goer-tcp6", args: args{"127.0.0.1:8083", nil, "tcp6"}},
 	}
 	var w sync.WaitGroup
@@ -30,10 +31,10 @@ func TestNewGoer(t *testing.T) {
 			go func() {
 				defer w.Done()
 				g.RunAll()
-				g.OnConnect = func(connection *connections.TcpConnection) {
+				g.OnConnect = func(connection connections.ConnectionInterface) {
 					fmt.Println("OnConnect callback.")
 				}
-				g.OnMessage = func(connection *connections.TcpConnection, data string) {
+				g.OnMessage = func(connection connections.ConnectionInterface, data []byte) {
 					fmt.Printf("OnMessage: %s\n", data)
 				}
 				g.OnClose = func() {
@@ -44,3 +45,26 @@ func TestNewGoer(t *testing.T) {
 	}
 	w.Wait()
 }
+
+// test start model, debug mode and daemon mode.
+//func TestGoer_StartModel(t *testing.T) {
+//	type args struct {
+//		daemon bool
+//	}
+//	tests := []struct {
+//		name string
+//		args args
+//	}{
+//		{name: "daemon-model", args: args{true}},
+//		{name: "debug-model", args: args{false}},
+//		//{name: "goer-tcp6", args: args{"127.0.0.1:8083", nil, "tcp6"}},
+//	}
+//
+//	for tt := range tests {
+//		t.Run(tt.name, func(t *testing.T) {
+//
+//		})
+//	}
+//	goer := NewGoer("127.0.0.1:9090", protocols.NewTextProtocol(), "tcp")
+//	goer.Daemon = true
+//}

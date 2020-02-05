@@ -108,8 +108,8 @@ func (g *Goer) RunAll() {
 	g.parseCommand()
 	g.daemon()
 	g.resetStd()
-	g.initWorkers()
 	g.installSignal()
+	g.initWorkers()
 	g.saveMainPid()
 	g.displayUI()
 	g.monitorWorkers()
@@ -196,6 +196,7 @@ func (g *Goer) parseCommand() {
 		g.mainPid = os.Getpid()
 		g.saveMainPid()
 		lib.Info("Goer start in DEBUG mode.")
+		lib.Info("Goer main socket process id: %v", g.mainPid)
 	case "stop":
 		if _, err := os.Stat(g.PidFile); err == nil {
 			data, err := ioutil.ReadFile(g.PidFile)
@@ -295,7 +296,31 @@ func (g *Goer) monitorWorkers() {
 
 // installSignal install signal handler.
 func (g *Goer) installSignal() {
+	ch := make(chan os.Signal, 1)
+	// SIGINT => stop
+	// SIGTERM => graceful stop
+	// SIGUSR1 => reload
+	// SIGQUIT => graceful reload
+	// SIGUSR2 => status
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGUSR1, syscall.SIGUSR2)
+	go func() {
+		signalType := <-ch
+		switch signalType {
+		// stop process in debug mode with Ctrl+c.
+		case syscall.SIGINT:
+			signal.Stop(ch)
+			lib.Info("Goer is stopping...")
 
+			// remove pid file.
+			err := os.Remove(g.PidFile)
+			if err != nil {
+				lib.Fatal("Remove pid file fail: %v", err)
+			}
+			lib.Info("Goer stop success")
+
+			os.Exit(0)
+		}
+	}()
 }
 
 // listen create a listen socket.

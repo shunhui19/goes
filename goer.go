@@ -1,7 +1,6 @@
 package goes
 
 import (
-	"fmt"
 	"goes/connections"
 	"goes/lib"
 	"goes/protocols"
@@ -153,13 +152,13 @@ func (g *Goer) parseCommand() {
 	}
 
 	// parse command.
-	command := strings.Trim(os.Args[0], " ")
+	command := strings.Trim(os.Args[1], " ")
 	command2 := ""
 	if len(os.Args) == 3 {
 		command2 = os.Args[2]
 	}
 
-	switch os.Args[1] {
+	switch command {
 	// main goroutine.
 	case "main":
 		ch := make(chan os.Signal, 1)
@@ -169,7 +168,6 @@ func (g *Goer) parseCommand() {
 			signalType := <-ch
 			switch signalType {
 			case syscall.SIGKILL | syscall.SIGTERM:
-				fmt.Println(1111)
 				// if receive one signal then stop receive others signal.
 				signal.Stop(ch)
 				lib.Info("Received signal type: %v", signalType)
@@ -191,19 +189,10 @@ func (g *Goer) parseCommand() {
 			lib.Fatal("Already running or pid: %s file exist", g.PidFile)
 		}
 
-		if command2 == "-d" || g.Daemon {
-			if g.Daemon == false {
-				g.Daemon = true
-			}
-
-			cmd := exec.Command(command, "main")
-			cmd.Start()
-			lib.Info("Goer start in DAEMON mode.")
-			g.mainPid = cmd.Process.Pid
-			g.saveMainPid()
-			lib.Info("Goer main socket process id: %v", g.mainPid)
-			os.Exit(0)
+		if command2 == "-d" {
+			g.Daemon = true
 		}
+
 		g.mainPid = os.Getpid()
 		g.saveMainPid()
 		lib.Info("Goer start in DEBUG mode.")
@@ -246,7 +235,17 @@ func (g *Goer) parseCommand() {
 
 // daemon run as daemon mode.
 func (g *Goer) daemon() {
+	if g.Daemon == false {
+		return
+	}
 
+	cmd := exec.Command(os.Args[0], "main")
+	cmd.Start()
+	lib.Info("Goer start in DAEMON mode.")
+	g.mainPid = cmd.Process.Pid
+	g.saveMainPid()
+	lib.Info("Goer main socket process id: %v", g.mainPid)
+	os.Exit(0)
 }
 
 // initWorkers init all worker instances.

@@ -1,12 +1,21 @@
 package goes
 
 import (
+	"fmt"
 	"goes/connections"
 	"goes/lib"
 	"goes/protocols"
+	"io/ioutil"
 	"net"
 	"os"
+	"os/exec"
+	"os/signal"
+	"path/filepath"
+	"runtime"
+	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 )
 
 const (
@@ -57,12 +66,16 @@ type Goer struct {
 	StdoutFile string
 	// LogFile log file.
 	LogFile string
+	// PidFile pid file.
+	PidFile string
 	// GracefulStop graceful stop or not.
 	gracefulStop bool
 	// mainSocket listening socket.
 	mainSocket interface{}
 	// socketName socket name, the format is like this http://127.0.0.1:8080
 	socketName string
+	// mainPid the pid of the socket process.
+	mainPid int
 	// rootPath root path.
 	rootPath string
 	// connections store all connections of client.
@@ -122,11 +135,113 @@ func (g *Goer) init() {
 	if g.StdoutFile == "" {
 		g.StdoutFile = "/dev/null"
 	}
+
+	// default pid file.
+	if g.PidFile == "" {
+		_, prefix, _, _ := runtime.Caller(1)
+		path := filepath.Dir(prefix)
+		prefix = strings.ReplaceAll(prefix, "/", "_")
+		subStr := strings.Split(prefix, ".")
+		g.PidFile = path + "/" + subStr[0] + ".pid"
+	}
 }
 
 // parseCommand parse command.
 func (g *Goer) parseCommand() {
+	if len(os.Args) < 2 {
+		lib.Fatal("Usage: %s [start|stop] \n", os.Args[0])
+	}
 
+	// parse command.
+	command := strings.Trim(os.Args[0], " ")
+	command2 := ""
+	if len(os.Args) == 3 {
+		command2 = os.Args[2]
+	}
+
+	switch os.Args[1] {
+	// main goroutine.
+	case "main":
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGUSR2)
+		go func() {
+			// block waiting to receive signal.
+			signalType := <-ch
+			switch signalType {
+			case syscall.SIGKILL | syscall.SIGTERM:
+				fmt.Println(1111)
+				// if receive one signal then stop receive others signal.
+				signal.Stop(ch)
+				lib.Info("Received signal type: %v", signalType)
+
+				// remove pid file.
+				err := os.Remove(g.PidFile)
+				if err != nil {
+					lib.Fatal("Remove pid file fail: %v", err)
+				}
+
+				os.Exit(0)
+			case syscall.SIGUSR2:
+				lib.Info("Receive user signal: %v", signalType)
+			default:
+			}
+		}()
+	case "start":
+		if _, err := os.Stat(g.PidFile); err == nil {
+			lib.Fatal("Already running or pid: %s file exist", g.PidFile)
+		}
+
+		if command2 == "-d" || g.Daemon {
+			if g.Daemon == false {
+				g.Daemon = true
+			}
+
+			cmd := exec.Command(command, "main")
+			cmd.Start()
+			lib.Info("Goer start in DAEMON mode.")
+			g.mainPid = cmd.Process.Pid
+			g.saveMainPid()
+			lib.Info("Goer main socket process id: %v", g.mainPid)
+			os.Exit(0)
+		}
+		g.mainPid = os.Getpid()
+		g.saveMainPid()
+		lib.Info("Goer start in DEBUG mode.")
+	case "stop":
+		if _, err := os.Stat(g.PidFile); err == nil {
+			data, err := ioutil.ReadFile(g.PidFile)
+			if err != nil {
+				lib.Fatal("Goer not run.")
+			}
+
+			processPid, err := strconv.Atoi(string(data))
+			if err != nil {
+				lib.Fatal("Unable to read and parse process pid found in: %v", g.PidFile)
+			}
+
+			process, err := os.FindProcess(processPid)
+			if err != nil {
+				lib.Fatal("Unable to find process ID[%v]", processPid)
+			}
+
+			// remove pid file.
+			os.Remove(g.PidFile)
+
+			// kill process.
+			lib.Info("Goer is stopping...")
+			err = process.Kill()
+			if err != nil {
+				lib.Fatal("Goer stop fail, error: %v", err)
+			}
+			lib.Info("Goer stop success")
+
+			os.Exit(0)
+		} else {
+			lib.Fatal("Goer not run.")
+		}
+	default:
+		lib.Fatal("Unknown command: %v", os.Args[1])
+	}
 }
 
 // daemon run as daemon mode.
@@ -141,7 +256,18 @@ func (g *Goer) initWorkers() {
 
 // saveMainPid save pid.
 func (g *Goer) saveMainPid() {
+	file, err := os.Create(g.PidFile)
+	if err != nil {
+		lib.Fatal("Unable to create pid file: %v\n", err)
+	}
 
+	defer file.Close()
+
+	_, err = file.WriteString(strconv.Itoa(g.mainPid))
+	if err != nil {
+		lib.Fatal("Unable to write pid number to file: %v\n", err)
+	}
+	file.Sync()
 }
 
 // displayUI display starting UI.

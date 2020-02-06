@@ -315,11 +315,8 @@ func (g *Goer) stopAll(ch chan os.Signal, sig os.Signal) {
 	signal.Stop(ch)
 	lib.Info("Received signal type: %v", sig)
 
-	// close client.
-	g.Connections.Range(func(k, connection interface{}) bool {
-		connection.(connections.ConnectionInterface).Close("")
-		return true
-	})
+	// execute exit.
+	g.stop()
 
 	// remove pid file.
 	err := os.Remove(g.PidFile)
@@ -329,6 +326,20 @@ func (g *Goer) stopAll(ch chan os.Signal, sig os.Signal) {
 	lib.Info("Goer stop success")
 
 	os.Exit(0)
+}
+
+// stop stop goer instance.
+func (g *Goer) stop() {
+	// emitted OnGoerStop callback func.
+	if g.OnGoerStop != nil {
+		g.OnGoerStop()
+	}
+
+	// close client.
+	g.Connections.Range(func(k, connection interface{}) bool {
+		connection.(connections.ConnectionInterface).Close("")
+		return true
+	})
 }
 
 // listen create a listen socket.

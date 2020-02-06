@@ -305,6 +305,20 @@ func (g *Goer) installSignal() {
 			lib.Info("Goer stop success")
 
 			os.Exit(0)
+		// kill signal in bash shell.
+		case syscall.SIGKILL | syscall.SIGTERM:
+			lib.Info("Goer is stopping...")
+			signal.Stop(ch)
+			lib.Info("Received signal type: %v", signalType)
+
+			// remove pid file.
+			err := os.Remove(g.PidFile)
+			if err != nil {
+				lib.Fatal("Remove pid file fail: %v", err)
+			}
+			lib.Info("Goer stop success")
+
+			os.Exit(0)
 		}
 	}()
 }

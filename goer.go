@@ -315,6 +315,12 @@ func (g *Goer) stopAll(ch chan os.Signal, sig os.Signal) {
 	signal.Stop(ch)
 	lib.Info("Received signal type: %v", sig)
 
+	// close client.
+	g.Connections.Range(func(k, connection interface{}) bool {
+		connection.(connections.ConnectionInterface).Close("")
+		return true
+	})
+
 	// remove pid file.
 	err := os.Remove(g.PidFile)
 	if err != nil {
@@ -382,7 +388,7 @@ func (g *Goer) acceptTcpConnection() {
 		connection.OnBufferDrain = g.OnBufferDrain
 		connection.OnBuffFull = g.OnBufferFull
 		// store all client connection.
-		g.Connections.Store(g.generateConnectionId(), *connection)
+		g.Connections.Store(g.generateConnectionId(), connection)
 
 		// trigger OnConnect if is set.
 		if g.OnConnect != nil {

@@ -147,6 +147,8 @@ func (g *Goer) init() {
 		subStr := strings.Split(prefix, ".")
 		g.PidFile = path + "/" + subStr[0] + ".pid"
 	}
+
+	g.status = StatusStarting
 }
 
 // parseCommand parse command.

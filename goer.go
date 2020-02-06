@@ -81,6 +81,8 @@ type Goer struct {
 	rootPath string
 	// connections store all connections of client.
 	connections sync.Map
+	// status current status.
+	status int
 	// OnConnect emitted when a socket connection is successfully established.
 	OnConnect func(connection connections.ConnectionInterface)
 	// OnMessage emitted when data is received.
@@ -294,33 +296,29 @@ func (g *Goer) installSignal() {
 		switch signalType {
 		// stop process in debug mode with Ctrl+c.
 		case syscall.SIGINT:
-			signal.Stop(ch)
-			lib.Info("Goer is stopping...")
-
-			// remove pid file.
-			err := os.Remove(g.PidFile)
-			if err != nil {
-				lib.Fatal("Remove pid file fail: %v", err)
-			}
-			lib.Info("Goer stop success")
-
-			os.Exit(0)
+			g.stopAll(ch, signalType)
 		// kill signal in bash shell.
 		case syscall.SIGKILL | syscall.SIGTERM:
-			lib.Info("Goer is stopping...")
-			signal.Stop(ch)
-			lib.Info("Received signal type: %v", signalType)
-
-			// remove pid file.
-			err := os.Remove(g.PidFile)
-			if err != nil {
-				lib.Fatal("Remove pid file fail: %v", err)
-			}
-			lib.Info("Goer stop success")
-
-			os.Exit(0)
+			g.stopAll(ch, signalType)
 		}
 	}()
+}
+
+// stopAll stop.
+func (g *Goer) stopAll(ch chan os.Signal, sig os.Signal) {
+	g.status = StatusShutdown
+	lib.Info("Goer is stopping...")
+	signal.Stop(ch)
+	lib.Info("Received signal type: %v", sig)
+
+	// remove pid file.
+	err := os.Remove(g.PidFile)
+	if err != nil {
+		lib.Fatal("Remove pid file fail: %v", err)
+	}
+	lib.Info("Goer stop success")
+
+	os.Exit(0)
 }
 
 // listen create a listen socket.

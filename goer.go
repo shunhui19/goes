@@ -79,8 +79,10 @@ type Goer struct {
 	mainPid int
 	// rootPath root path.
 	rootPath string
-	// connections store all connections of client.
-	connections sync.Map
+	// Connections store all Connections of client.
+	Connections sync.Map
+	// connectionId unique connection id.
+	connectionId int
 	// status current status.
 	status int
 	// OnConnect emitted when a socket connection is successfully established.
@@ -353,7 +355,7 @@ func (g *Goer) listen() {
 	}
 }
 
-// resumeAccept accept new connections.
+// resumeAccept accept new Connections.
 func (g *Goer) resumeAccept() {
 	switch g.Transport {
 	case "tcp", "tcp4", "tcp6", "unix", "unixpacket", "ssl":
@@ -372,9 +374,6 @@ func (g *Goer) acceptTcpConnection() {
 			continue
 		}
 		connection := connections.NewTcpConnection(&newSocket, newSocket.RemoteAddr().String())
-		// store all client connection.
-		g.connections.Store(connection.Id, *connection)
-		//connection.Goer = g
 		connection.Transport = g.Transport
 		connection.Protocol = g.Protocol
 		connection.OnMessage = g.OnMessage
@@ -382,6 +381,8 @@ func (g *Goer) acceptTcpConnection() {
 		connection.OnError = g.OnError
 		connection.OnBufferDrain = g.OnBufferDrain
 		connection.OnBuffFull = g.OnBufferFull
+		// store all client connection.
+		g.Connections.Store(g.generateConnectionId(), *connection)
 
 		// trigger OnConnect if is set.
 		if g.OnConnect != nil {
@@ -435,9 +436,9 @@ func (g *Goer) acceptUdpConnection() {
 	}
 }
 
-// RemoveConnection delete connection from connections store.
+// RemoveConnection delete connection from Connections store.
 func (g *Goer) RemoveConnection(connectionId int) {
-	g.connections.Delete(connectionId)
+	g.Connections.Delete(connectionId)
 }
 
 // NewGoer create object of Goer with socketName, application layer protocol and transport layer protocol,
@@ -448,4 +449,25 @@ func NewGoer(socketName string, applicationProtocol protocols.Protocol, transpor
 	}
 
 	return &Goer{socketName: socketName, Protocol: applicationProtocol, Transport: transportProtocol}
+}
+
+// generateConnectionId generate unique connection id.
+func (g *Goer) generateConnectionId() int {
+	maxUnsignedInt := int(2147483647)
+	if g.connectionId >= maxUnsignedInt {
+		g.connectionId = 1
+	}
+	for g.connectionId < maxUnsignedInt {
+		// start from 1.
+		if g.connectionId == 0 {
+			g.connectionId++
+			continue
+		}
+		// judge current id whether has used.
+		if _, ok := g.Connections.Load(g.connectionId); !ok {
+			break
+		}
+		g.connectionId++
+	}
+	return g.connectionId
 }

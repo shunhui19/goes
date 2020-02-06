@@ -263,7 +263,7 @@ func (t *TcpConnection) Read() {
 
 		n, err := (*t.socket).Read(buf)
 		if err != nil && err != io.EOF {
-			lib.Warn(err.Error())
+			//lib.Warn(err.Error())
 			t.Close("server close client")
 			return
 		}

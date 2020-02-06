@@ -61,6 +61,8 @@ type Goer struct {
 	Protocol protocols.Protocol
 	// Daemon daemon start.
 	Daemon bool
+	// isForked whether is a fork process after by os/exec.Command().
+	isForked bool
 	// StdoutFile stdout file.
 	StdoutFile string
 	// LogFile log file.
@@ -154,36 +156,21 @@ func (g *Goer) parseCommand() {
 	// parse command.
 	command := strings.Trim(os.Args[1], " ")
 	command2 := ""
-	if len(os.Args) == 3 {
-		command2 = os.Args[2]
+	if os.Args[1] == "start" {
+		model := "debug"
+		if len(os.Args) == 3 {
+			command2 = os.Args[2]
+			model = "daemon"
+		}
+		lib.Info("Goer start in %s mode.", strings.ToUpper(model))
 	}
 
 	switch command {
-	// main goroutine.
+	// daemon main goroutine.
+	// use os/exec.Command() function to launch a child process of parent program.
 	case "main":
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, syscall.SIGKILL, syscall.SIGTERM, syscall.SIGUSR2)
-		go func() {
-			// block waiting to receive signal.
-			signalType := <-ch
-			switch signalType {
-			case syscall.SIGKILL | syscall.SIGTERM:
-				// if receive one signal then stop receive others signal.
-				signal.Stop(ch)
-				lib.Info("Received signal type: %v", signalType)
-
-				// remove pid file.
-				err := os.Remove(g.PidFile)
-				if err != nil {
-					lib.Fatal("Remove pid file fail: %v", err)
-				}
-
-				os.Exit(0)
-			case syscall.SIGUSR2:
-				lib.Info("Receive user signal: %v", signalType)
-			default:
-			}
-		}()
+		g.Daemon = true
+		g.isForked = true
 	case "start":
 		if _, err := os.Stat(g.PidFile); err == nil {
 			lib.Fatal("Already running or pid: %s file exist", g.PidFile)
@@ -195,8 +182,6 @@ func (g *Goer) parseCommand() {
 
 		g.mainPid = os.Getpid()
 		g.saveMainPid()
-		lib.Info("Goer start in DEBUG mode.")
-		lib.Info("Goer main socket process id: %v", g.mainPid)
 	case "stop":
 		if _, err := os.Stat(g.PidFile); err == nil {
 			data, err := ioutil.ReadFile(g.PidFile)
@@ -236,17 +221,18 @@ func (g *Goer) parseCommand() {
 
 // daemon run as daemon mode.
 func (g *Goer) daemon() {
-	if g.Daemon == false {
+	if !g.Daemon {
 		return
 	}
 
-	cmd := exec.Command(os.Args[0], "main")
-	cmd.Start()
-	lib.Info("Goer start in DAEMON mode.")
-	g.mainPid = cmd.Process.Pid
-	g.saveMainPid()
-	lib.Info("Goer main socket process id: %v", g.mainPid)
-	os.Exit(0)
+	if !g.isForked {
+		cmd := exec.Command(os.Args[0], "main")
+		cmd.Start()
+		g.mainPid = cmd.Process.Pid
+		g.saveMainPid()
+		lib.Info("Goer main socket process id: %v", g.mainPid)
+		os.Exit(0)
+	}
 }
 
 // initWorkers init all worker instances.

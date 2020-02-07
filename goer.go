@@ -114,8 +114,8 @@ func (g *Goer) RunAll() {
 	g.parseCommand()
 	g.daemon()
 	g.resetStd()
-	g.installSignal()
 	g.initWorkers()
+	g.installSignal()
 	g.saveMainPid()
 	g.displayUI()
 	g.monitorWorkers()
@@ -295,8 +295,7 @@ func (g *Goer) installSignal() {
 	// SIGQUIT => graceful reload
 	// SIGUSR2 => status
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGUSR1, syscall.SIGUSR2)
-	go func() {
-		signalType := <-ch
+	for signalType := range ch {
 		switch signalType {
 		// stop process in debug mode with Ctrl+c.
 		case syscall.SIGINT:
@@ -305,7 +304,7 @@ func (g *Goer) installSignal() {
 		case syscall.SIGKILL | syscall.SIGTERM:
 			g.stopAll(ch, signalType)
 		}
-	}()
+	}
 }
 
 // stopAll stop.
@@ -368,7 +367,7 @@ func (g *Goer) listen() {
 
 		lib.Info("server start success...")
 
-		g.resumeAccept()
+		go g.resumeAccept()
 	}
 }
 

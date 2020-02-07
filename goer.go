@@ -327,7 +327,13 @@ func (g *Goer) installSignal() {
 // reload graceful to restart service.
 // copy parent socket file descriptor to fork a child process.
 func (g *Goer) reload() {
+	g.status = StatusReloading
 	lib.Info("Goer is reloading...")
+
+	// emitted when goer process get reload signal.
+	if g.OnGoerReload != nil {
+		g.OnGoerReload()
+	}
 
 	// get parent process file descriptor.
 	f, err := g.mainSocket.(*net.TCPListener).File()
@@ -428,6 +434,7 @@ func (g *Goer) listen() {
 		}
 
 		lib.Info("server start success...")
+		g.status = StatusRunning
 
 		go g.resumeAccept()
 	}

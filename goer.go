@@ -1,6 +1,7 @@
 package goes
 
 import (
+	"fmt"
 	"goes/connections"
 	"goes/lib"
 	"goes/protocols"
@@ -15,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 )
 
 const (
@@ -189,37 +191,46 @@ func (g *Goer) parseCommand() {
 		g.mainPid = os.Getpid()
 		g.saveMainPid()
 	case "stop":
-		if _, err := os.Stat(g.PidFile); err == nil {
-			data, err := ioutil.ReadFile(g.PidFile)
-			if err != nil {
-				lib.Fatal("Goer not run.")
-			}
-
-			processPid, err := strconv.Atoi(string(data))
-			if err != nil {
-				lib.Fatal("Unable to read and parse process pid found in: %v", g.PidFile)
-			}
-
-			process, err := os.FindProcess(processPid)
-			if err != nil {
-				lib.Fatal("Unable to find process ID[%v]", processPid)
-			}
-
-			// remove pid file.
-			os.Remove(g.PidFile)
-
-			// kill process.
-			lib.Info("Goer is stopping...")
-			err = process.Kill()
-			if err != nil {
-				lib.Fatal("Goer stop fail, error: %v", err)
-			}
-			lib.Info("Goer stop success")
-
-			os.Exit(0)
-		} else {
-			lib.Fatal("Goer not run.")
+		processPid, err := g.getPid()
+		if err != nil {
+			lib.Fatal(err.Error())
 		}
+		process, err := os.FindProcess(processPid)
+		if err != nil {
+			lib.Fatal("Unable to find process ID[%v]", processPid)
+		}
+		// remove pid file.
+		os.Remove(g.PidFile)
+
+		// kill process.
+		lib.Info("Goer is stopping...")
+		err = process.Kill()
+		if err != nil {
+			lib.Fatal("Goer stop fail, error: %v", err)
+		}
+		lib.Info("Goer stop success")
+
+		os.Exit(0)
+	// reload.
+	case "reload":
+		processPid, err := g.getPid()
+		if err != nil {
+			lib.Fatal(err.Error())
+		}
+		process, err := os.FindProcess(processPid)
+		if err != nil {
+			lib.Fatal("Unable to find process ID[%v]", processPid)
+		}
+
+		// send SIGHUP signal to process.
+		err = process.Signal(syscall.SIGQUIT)
+		//err = syscall.Kill(processPid, syscall.SIGQUIT)
+		if err != nil {
+			lib.Fatal("Send SIGQUIT fail, error: %v", err)
+		}
+		time.Sleep(1 * time.Second)
+
+		os.Exit(0)
 	default:
 		lib.Fatal("Unknown command: %v", os.Args[1])
 	}
@@ -287,13 +298,14 @@ func (g *Goer) monitorWorkers() {
 }
 
 // installSignal install signal handler.
+// the defined signal is:
+// SIGINT => stop
+// SIGTERM => graceful stop
+// SIGUSR1 => reload
+// SIGQUIT => graceful reload
+// SIGUSR2 => status
 func (g *Goer) installSignal() {
 	ch := make(chan os.Signal, 1)
-	// SIGINT => stop
-	// SIGTERM => graceful stop
-	// SIGUSR1 => reload
-	// SIGQUIT => graceful reload
-	// SIGUSR2 => status
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGUSR1, syscall.SIGUSR2)
 	for signalType := range ch {
 		switch signalType {
@@ -303,8 +315,45 @@ func (g *Goer) installSignal() {
 		// kill signal in bash shell.
 		case syscall.SIGKILL | syscall.SIGTERM:
 			g.stopAll(ch, signalType)
+		// graceful reload
+		case syscall.SIGQUIT:
+			signal.Stop(ch)
+			g.reload()
+			os.Exit(0)
 		}
 	}
+}
+
+// reload graceful to restart service.
+// copy parent socket file descriptor to fork a child process.
+func (g *Goer) reload() {
+	lib.Info("Goer is reloading...")
+
+	// get parent process file descriptor.
+	f, err := g.mainSocket.(*net.TCPListener).File()
+	if err != nil {
+		lib.Fatal("ListenFD error: %v", err)
+	}
+
+	execSpec := &syscall.ProcAttr{
+		Env:   os.Environ(),
+		Files: []uintptr{os.Stdin.Fd(), os.Stdout.Fd(), os.Stderr.Fd(), f.Fd()},
+	}
+	os.Args = append(os.Args, "graceful")
+	childProcessPid, err := syscall.ForkExec(os.Args[0], os.Args, execSpec)
+	if err != nil {
+		lib.Fatal("Fail to fork: %v", err)
+	}
+
+	// write a child process FD to PidFile.
+	os.Remove(g.PidFile)
+	g.mainPid = childProcessPid
+	g.saveMainPid()
+	lib.Info("Received SIGQUIT to fork-exec: %v", childProcessPid)
+
+	// the parent process exit.
+	time.Sleep(1 * time.Minute)
+	lib.Info("Stop parent process success")
 }
 
 // stopAll stop.
@@ -350,11 +399,24 @@ func (g *Goer) listen() {
 	if g.mainSocket == nil {
 		switch g.Transport {
 		case "tcp", "tcp4", "tcp6", "unix", "unixpacket", "ssl":
-			listener, err := net.Listen(g.Transport, g.socketName)
-			if err != nil {
-				lib.Fatal(err.Error())
+			if len(os.Args) > 2 && os.Args[2] == "graceful" {
+				file := os.NewFile(3, "")
+				listener, err := net.FileListener(file)
+				if err != nil {
+					lib.Fatal("Fail to listen tcp: %v", err)
+				}
+				g.mainSocket = listener.(*net.TCPListener)
+			} else {
+				addr, err := net.ResolveTCPAddr(g.Transport, g.socketName)
+				if err != nil {
+					lib.Fatal("fail to resolve addr: %v", err)
+				}
+				listener, err := net.ListenTCP("tcp", addr)
+				if err != nil {
+					lib.Fatal("fail to listen tcp: %v", err)
+				}
+				g.mainSocket = listener
 			}
-			g.mainSocket = listener
 		case "udp", "upd4", "udp6", "unixgram":
 			listener, err := net.ListenPacket(g.Transport, g.socketName)
 			if err != nil {
@@ -384,8 +446,13 @@ func (g *Goer) resumeAccept() {
 // acceptTcpConnection accept a tcp connection.
 func (g *Goer) acceptTcpConnection() {
 	for {
-		newSocket, err := g.mainSocket.(net.Listener).Accept()
+		newSocket, err := g.mainSocket.(*net.TCPListener).Accept()
 		if err != nil {
+			// stop accept new connection when received reload signal.
+			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
+				lib.Info("stop accept new connection")
+				return
+			}
 			lib.Error("unAccept client:%s socket, reason: %s", newSocket.RemoteAddr().String(), err.Error())
 			continue
 		}
@@ -486,4 +553,21 @@ func (g *Goer) generateConnectionId() int {
 		g.connectionId++
 	}
 	return g.connectionId
+}
+
+// getPid get the pid value from PidFle.
+func (g *Goer) getPid() (int, error) {
+	if _, err := os.Stat(g.PidFile); err == nil {
+		data, err := ioutil.ReadFile(g.PidFile)
+		if err != nil {
+			lib.Fatal("Goer not run.")
+		}
+		processPid, err := strconv.Atoi(string(data))
+		if err != nil {
+			lib.Fatal("Unable to read and parse process pid found in: %v", g.PidFile)
+		}
+		return processPid, nil
+	} else {
+		return 0, fmt.Errorf("Goer not run.")
+	}
 }

@@ -116,7 +116,7 @@ func (g *Goer) RunAll() {
 	g.parseCommand()
 	g.daemon()
 	g.resetStd()
-	g.initWorkers()
+	g.listen()
 	g.installSignal()
 	g.saveMainPid()
 	g.displayUI()
@@ -250,11 +250,6 @@ func (g *Goer) daemon() {
 		lib.Info("Goer main socket process id: %v", g.mainPid)
 		os.Exit(0)
 	}
-}
-
-// initWorkers init all worker instances.
-func (g *Goer) initWorkers() {
-	g.listen()
 }
 
 // saveMainPid save pid.

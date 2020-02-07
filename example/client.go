@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"sync"
@@ -9,7 +10,7 @@ import (
 
 func main() {
 	var wg sync.WaitGroup
-	for i := 0; i < 500; i++ {
+	for i := 0; i < 5; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -24,7 +25,7 @@ func main() {
 			go receive(conn, &w)
 
 			// 每个连接送数据
-			for j := 0; j < 100000; j++ {
+			for j := 0; j < 1; j++ {
 				send(conn, []byte(fmt.Sprintf("[%d]%d-hello\n", i, j)))
 			}
 
@@ -41,6 +42,9 @@ func receive(conn net.Conn, wg *sync.WaitGroup) {
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
+			if err == io.EOF {
+				log.Fatalln("server close.")
+			}
 			log.Printf("client received error: %v\n", err)
 			continue
 		}

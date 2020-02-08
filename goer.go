@@ -82,7 +82,8 @@ type Goer struct {
 	// rootPath root path.
 	rootPath string
 	// Connections store all Connections of client.
-	Connections sync.Map
+	Connections  sync.Map
+	gracefulWait *sync.WaitGroup
 	// connectionId unique connection id.
 	connectionId int
 	// status current status.
@@ -323,6 +324,12 @@ func (g *Goer) installSignal() {
 // copy parent socket file descriptor to fork a child process.
 func (g *Goer) reload() {
 	g.status = StatusReloading
+
+	// notice parents process stop accept new connection.
+	err := g.mainSocket.(*net.TCPListener).SetDeadline(time.Now())
+	if err != nil {
+		lib.Fatal("listener socket set timeout fail: %v", err)
+	}
 	lib.Info("Goer is reloading...")
 
 	// emitted when goer process get reload signal.
@@ -330,7 +337,7 @@ func (g *Goer) reload() {
 		g.OnGoerReload()
 	}
 
-	// get parent process file descriptor.
+	// get parent process of listener file descriptor.
 	f, err := g.mainSocket.(*net.TCPListener).File()
 	if err != nil {
 		lib.Fatal("ListenFD error: %v", err)
@@ -346,14 +353,23 @@ func (g *Goer) reload() {
 		lib.Fatal("Fail to fork: %v", err)
 	}
 
-	// write a child process FD to PidFile.
+	// write the child process FD to PidFile.
 	os.Remove(g.PidFile)
 	g.mainPid = childProcessPid
 	g.saveMainPid()
 	lib.Info("Received SIGQUIT to fork-exec: %v", childProcessPid)
 
-	// the parent process exit.
-	time.Sleep(1 * time.Minute)
+	// wait for the connections finished which belongs to parent process,
+	// and then parent process exit.
+	// if the connections finished time Exceeded maximum completion time,
+	// the server will close all client.
+	if err := g.gracefulWaitTimeout(time.Minute); err != nil {
+		g.Connections.Range(func(key, value interface{}) bool {
+			value.(connections.ConnectionInterface).Close("server is graceful restart")
+			return true
+		})
+		lib.Fatal("Timeout when graceful")
+	}
 	lib.Info("Stop parent process success")
 }
 
@@ -474,9 +490,11 @@ func (g *Goer) acceptTcpConnection() {
 			g.OnConnect(connection)
 		}
 
+		g.gracefulWait.Add(1)
 		go func() {
 			defer connection.Close("")
 			connection.Read()
+			g.gracefulWait.Done()
 		}()
 	}
 }
@@ -533,7 +551,7 @@ func NewGoer(socketName string, applicationProtocol protocols.Protocol, transpor
 		lib.Fatal("the socket address can not be empty")
 	}
 
-	return &Goer{socketName: socketName, Protocol: applicationProtocol, Transport: transportProtocol}
+	return &Goer{socketName: socketName, Protocol: applicationProtocol, Transport: transportProtocol, gracefulWait: &sync.WaitGroup{}}
 }
 
 // generateConnectionId generate unique connection id.
@@ -571,5 +589,23 @@ func (g *Goer) getPid() (int, error) {
 		return processPid, nil
 	} else {
 		return 0, fmt.Errorf("Goer not run.")
+	}
+}
+
+// gracefulWaitTimeout set graceful timeout.
+func (g *Goer) gracefulWaitTimeout(duration time.Duration) error {
+	timeout := time.NewTicker(duration)
+	wait := make(chan struct{})
+
+	go func() {
+		g.gracefulWait.Wait()
+		wait <- struct{}{}
+	}()
+
+	select {
+	case <-timeout.C:
+		return fmt.Errorf("time out")
+	case <-wait:
+		return nil
 	}
 }

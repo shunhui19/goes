@@ -1,4 +1,8 @@
 // TcpConnection.
+// note: in OSX system, the default max concurrency is limited to 128,
+// so when your concurrency number more than 128 will occur error: connect: connection reset by peer.
+// you should by setting: 'sysctl -w kern.ipc.somaxconn=xxx', xxx is the max currency number.
+// link https://github.com/golang/go/issues/20960 .
 package connections
 
 import (
@@ -136,7 +140,7 @@ func (t *TcpConnection) Send(buffer string, raw bool) interface{} {
 			t.byteWrite += n
 		} else {
 			// connection whether is closed.
-			if t.socket == nil {
+			if t.socket == nil || err == io.EOF {
 				t.baseConnection.SendFail++
 				if t.OnError != nil {
 					t.OnError(2, "client closed!")
@@ -262,7 +266,7 @@ func (t *TcpConnection) Read() {
 		buf := make([]byte, 1024)
 
 		n, err := (*t.socket).Read(buf)
-		if err != nil && err != io.EOF {
+		if err != nil || err == io.EOF {
 			//lib.Warn(err.Error())
 			t.Close("server close client")
 			return

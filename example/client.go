@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 func main() {
@@ -25,8 +26,9 @@ func main() {
 			go receive(conn, &w)
 
 			// 每个连接送数据
-			for j := 0; j < 1; j++ {
-				send(conn, []byte(fmt.Sprintf("[%d]%d-hello\n", i, j)))
+			for j := 0; j < 100; j++ {
+				send(conn, []byte(fmt.Sprintf("[%d]%d-ccccc\n", i, j)))
+				time.Sleep(time.Second)
 			}
 
 			w.Wait()

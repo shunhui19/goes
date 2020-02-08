@@ -48,13 +48,13 @@ var buildInTransports = []map[string]string{
 
 type Goer struct {
 	// Name the name of main goroutine.
-	Name string
+	//Name string
 	// User unix user of process, needs appropriate privileges, usually root.
-	User string
+	//User string
 	// Reloadable reloadable.
-	Reloadable bool
+	//Reloadable bool
 	// ReusePort reuse port.
-	ReusePort bool
+	//ReusePort bool
 	// Transport the protocol of transport layer, if transport layer protocol is empty,
 	// the default protocol is tcp.
 	Transport string
@@ -71,8 +71,6 @@ type Goer struct {
 	LogFile string
 	// PidFile pid file.
 	PidFile string
-	// GracefulStop graceful stop or not.
-	gracefulStop bool
 	// mainSocket listening socket.
 	mainSocket interface{}
 	// socketName socket name, the format is like this http://127.0.0.1:8080
@@ -82,7 +80,8 @@ type Goer struct {
 	// rootPath root path.
 	rootPath string
 	// Connections store all Connections of client.
-	Connections  sync.Map
+	Connections sync.Map
+	// gracefulWait wait for connections graceful exit which belongs to old process.
 	gracefulWait *sync.WaitGroup
 	// connectionId unique connection id.
 	connectionId int
@@ -105,9 +104,9 @@ type Goer struct {
 	// OnGoerReload emitted when goer process get reload signal.
 	OnGoerReload func()
 	// OnMainGoroutineReload emitted when the main goroutine process get reload signal.
-	OnMainGoroutineReload func()
+	//OnMainGoroutineReload func()
 	// OnMainGoroutineStop emitted when the main goroutine terminated.
-	OnMainGoroutineStop func()
+	//OnMainGoroutineStop func()
 }
 
 // RunAll start server.

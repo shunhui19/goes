@@ -158,7 +158,8 @@ func (g *Goer) init() {
 // parseCommand parse command.
 func (g *Goer) parseCommand() {
 	if len(os.Args) < 2 {
-		lib.Fatal("Usage: %s [start|stop] \n", os.Args[0])
+		fmt.Printf("Usage: yourExecuteFile <command> [mode]\ncommand:\nstart\tStart goer in DEBUG mode.\n\tUse mode -d to start in DAEMON mode.\nstop\tStop goer.\nreload\tReload codes.\n")
+		os.Exit(0)
 	}
 
 	// parse command.

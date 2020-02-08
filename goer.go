@@ -119,8 +119,8 @@ func (g *Goer) RunAll() {
 	g.listen()
 	g.installSignal()
 	g.saveMainPid()
-	g.displayUI()
-	g.monitorWorkers()
+	//g.displayUI()
+	//g.monitorWorkers()
 }
 
 // checkEnv check environment.

@@ -6,12 +6,11 @@ import (
 	"log"
 	"net"
 	"sync"
-	"time"
 )
 
 func main() {
 	var wg sync.WaitGroup
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 500; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
@@ -26,9 +25,9 @@ func main() {
 			go receive(conn, &w)
 
 			// 每个连接送数据
-			for j := 0; j < 100; j++ {
+			for j := 0; j < 1000; j++ {
 				send(conn, []byte(fmt.Sprintf("[%d]%d-ccccc\n", i, j)))
-				time.Sleep(time.Second)
+				//time.Sleep(time.Second)
 			}
 
 			w.Wait()

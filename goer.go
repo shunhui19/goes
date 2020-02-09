@@ -118,7 +118,6 @@ func (g *Goer) RunAll() {
 	g.resetStd()
 	g.listen()
 	g.installSignal()
-	g.saveMainPid()
 	//g.displayUI()
 	//g.monitorWorkers()
 }
@@ -247,7 +246,6 @@ func (g *Goer) daemon() {
 		cmd.Start()
 		g.mainPid = cmd.Process.Pid
 		g.saveMainPid()
-		lib.Info("Goer main socket process id: %v", g.mainPid)
 		os.Exit(0)
 	}
 }
@@ -470,7 +468,7 @@ func (g *Goer) acceptTcpConnection() {
 		if err != nil {
 			// stop accept new connection when received reload signal.
 			if nErr, ok := err.(net.Error); ok && nErr.Timeout() {
-				lib.Info("stop accept new connection")
+				lib.Info("parent process stop accept new connection")
 				return
 			}
 			lib.Error("unAccept client:%s socket, reason: %s", newSocket.RemoteAddr().String(), err.Error())

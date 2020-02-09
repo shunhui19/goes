@@ -225,11 +225,10 @@ func (g *Goer) parseCommand() {
 
 		// send SIGHUP signal to process.
 		err = process.Signal(syscall.SIGQUIT)
-		//err = syscall.Kill(processPid, syscall.SIGQUIT)
 		if err != nil {
 			lib.Fatal("Send SIGQUIT fail, error: %v", err)
 		}
-		time.Sleep(1 * time.Second)
+		//time.Sleep(1 * time.Second)
 
 		os.Exit(0)
 	default:
@@ -347,7 +346,10 @@ func (g *Goer) reload() {
 		Env:   os.Environ(),
 		Files: []uintptr{os.Stdin.Fd(), os.Stdout.Fd(), os.Stderr.Fd(), f.Fd()},
 	}
-	os.Args = append(os.Args, "graceful")
+	// avoid exec reload command too long when exec many times.
+	if len(os.Args) < 3 {
+		os.Args = append(os.Args, "graceful")
+	}
 	childProcessPid, err := syscall.ForkExec(os.Args[0], os.Args, execSpec)
 	if err != nil {
 		lib.Fatal("Fail to fork: %v", err)

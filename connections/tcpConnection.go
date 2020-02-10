@@ -125,9 +125,17 @@ func (t *TcpConnection) Send(buffer string, raw bool) interface{} {
 	// when the connection is established, send data directed.
 	if len(t.sendBuffer) == 0 {
 		n, err := (*t.socket).Write([]byte(buffer))
+		// connection maybe closed.
 		if err != nil {
 			lib.Warn("send data error: %v", err.Error())
-			return false
+			if t.socket == nil || err == io.EOF {
+				t.baseConnection.SendFail++
+				if t.OnError != nil {
+					t.OnError(2, "client closed!")
+				}
+				t.destroy()
+				return false
+			}
 		}
 		// send success.
 		if n == len(buffer) {

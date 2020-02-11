@@ -10,14 +10,14 @@ import (
 
 func main() {
 	var wg sync.WaitGroup
-	for i := 0; i < 500; i++ {
+	for i := 0; i < 2000; i++ {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			var w sync.WaitGroup
 			conn, err := net.Dial("tcp", "127.0.0.1:8080")
 			if err != nil {
-				log.Fatal(err)
+				log.Fatal("connect server error: ", err)
 			}
 			defer conn.Close()
 
@@ -25,8 +25,8 @@ func main() {
 			go receive(conn, &w)
 
 			// 每个连接送数据
-			for j := 0; j < 1000; j++ {
-				send(conn, []byte(fmt.Sprintf("[%d]%d-ccccc\n", i, j)))
+			for j := 0; j < 10000; j++ {
+				send(conn, []byte(fmt.Sprintf("[%d]%d-hello\n", i, j)))
 				//time.Sleep(time.Second)
 			}
 
@@ -34,6 +34,7 @@ func main() {
 		}(i)
 	}
 	wg.Wait()
+	fmt.Println("done")
 }
 
 func receive(conn net.Conn, wg *sync.WaitGroup) {
@@ -41,7 +42,7 @@ func receive(conn net.Conn, wg *sync.WaitGroup) {
 	buf := make([]byte, 1024)
 	receivedCount := 0
 	for {
-		n, err := conn.Read(buf)
+		_, err := conn.Read(buf)
 		if err != nil {
 			if err == io.EOF {
 				log.Fatalln("server close.")
@@ -50,7 +51,7 @@ func receive(conn net.Conn, wg *sync.WaitGroup) {
 			continue
 		}
 		receivedCount++
-		fmt.Printf("The %d received, content: %v", receivedCount, string(buf[:n]))
+		//fmt.Printf("The %d received, content: %v", receivedCount, string(buf[:n]))
 	}
 }
 

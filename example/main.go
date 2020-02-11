@@ -1,15 +1,23 @@
 package main
 
 import (
-	"fmt"
 	"goes"
 	"goes/connections"
-	"goes/lib"
 	"goes/protocols"
+	"log"
 	"os"
+	"runtime/pprof"
 )
 
 func main() {
+	f, err := os.Create("./cpuprofile.prof")
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = pprof.StartCPUProfile(f)
+	if err != nil {
+		log.Fatal(err)
+	}
 	goer := goes.NewGoer("127.0.0.1:8080", protocols.NewTextProtocol(), "tcp")
 	goer.StdoutFile = "./server.log"
 	//goer.OnConnect = func(connection *connections.TcpConnection) {
@@ -28,14 +36,15 @@ func main() {
 	}
 
 	goer.OnMessage = func(connection connections.ConnectionInterface, data []byte) {
-		fmt.Printf("mainGoroutine[%d]Receive: %s\n", os.Getpid(), string(data))
-		connection.Send(string(data), false)
+		//fmt.Printf("mainGoroutine[%d]Receive: %s\n", os.Getpid(), string(data))
+		//lib.Info(string(data))
+		connection.Send("HTTP/1.1 200 OK\r\nConnection: keep-alive\r\nServer: workerman\\1.1.4\r\n\r\nhello", false)
 		//connection.Send(fmt.Sprintf("the client send message is %v", string(data)), false)
 		//fmt.Println(status)
 	}
 
 	goer.OnClose = func() {
-		lib.Info("client is closed")
+		//lib.Info("client is closed")
 	}
 
 	//goer.Transport = "udp"

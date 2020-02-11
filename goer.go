@@ -471,7 +471,7 @@ func (g *Goer) acceptTcpConnection() {
 				lib.Info("parent process stop accept new connection")
 				return
 			}
-			lib.Error("unAccept client:%s socket, reason: %s", newSocket.RemoteAddr().String(), err.Error())
+			lib.Error("unAccept client socket, reason: %s", err.Error())
 			continue
 		}
 		connection := connections.NewTcpConnection(&newSocket, newSocket.RemoteAddr().String())

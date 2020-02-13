@@ -5,8 +5,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"fmt"
 	"goes/lib"
+	"net/url"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -77,7 +77,13 @@ type Http struct {
 	// sessionFile session file.
 	sessionFile string
 	// post post data.
-	post map[string]interface{}
+	//post map[string]interface{}
+	post *url.Values
+}
+
+// GetPost return the data of post method.
+func (h *Http) GetPost() url.Values {
+	return *h.post
 }
 
 // Input check the integrity of the package.
@@ -98,9 +104,7 @@ func (h *Http) Input(recvBuffer []byte) interface{} {
 			return h.getRequestSize(header, method)
 		}
 	}
-	lib.Warn("HTTP/1.1 400 Bad Request\r\n\r\n")
 	return 0
-	//return 0, "HTTP/1.1 400 Bad Request\r\n\r\n"
 }
 
 // Encode http encode.
@@ -142,7 +146,7 @@ func (h *Http) Encode(data []byte) []byte {
 	}
 
 	// header.
-	header += "Server: Goes/" + "\r\nContent-Length: " + strconv.Itoa(len(data)) + "\r\n\r\n"
+	header += "Server: Goes/0.1" + "\r\nContent-Length: " + strconv.Itoa(len(data)) + "\r\n\r\n"
 
 	// save session.
 
@@ -152,11 +156,15 @@ func (h *Http) Encode(data []byte) []byte {
 
 // Decode parse POST, GET, COOKIE.
 func (h *Http) Decode(recvBuffer []byte) []byte {
+	lib.Info("recvBuff: %v", string(recvBuffer))
 	if h.header == nil {
 		h.header = make(map[string]interface{})
 	}
+	if h.post == nil {
+		h.post = new(url.Values)
+	}
 	h.header["Connection"] = "Connection: keep-alive"
-	h.instance = &Http{}
+	//h.instance = &Http{}
 	server := map[string]interface{}{
 		"QUERY_STRING":         "",
 		"REQUEST_METHOD":       "",
@@ -174,7 +182,7 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 		"CONTENT_TYPE":         "",
 		"REMOTE_ADDR":          "",
 		"REMOTE_PORT":          "",
-		"REQUEST_TIME":         time.UTC,
+		"REQUEST_TIME":         time.Now().Format("Mon, 02 Jan 2006 15:04:05 GMT"),
 	}
 
 	// parse header.
@@ -185,7 +193,7 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 	server["REQUEST_METHOD"], server["REQUEST_URL"], server["REQUEST_PROTOCOL"] = string(headerData2[0]), string(headerData2[1]), string(headerData2[2])
 
 	// parse general header.
-	//httpPostBoundary := ""
+	httpPostBoundary := ""
 	for i, v := range headerData {
 		if i == 0 || len(v) == 0 {
 			continue
@@ -193,7 +201,7 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 		keyValue := bytes.SplitN(v, []byte(":"), 2)
 		key := string(bytes.ToUpper(bytes.Replace(keyValue[0], []byte("-"), []byte("_"), 1)))
 		value := bytes.Trim(keyValue[1], " ")
-		server["HTTP_"+key] = value
+		server["HTTP_"+key] = string(value)
 		switch key {
 		// HTTP_HOST.
 		case "HOST":
@@ -211,19 +219,23 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 			matches := re.FindSubmatch(v)
 			if matches == nil {
 				if pos := bytes.IndexAny(v, ";"); pos != -1 {
-					server["CONTENT_TYPE"] = v[:pos]
+					server["CONTENT_TYPE"] = value[:pos]
 				} else {
-					server["CONTENT_TYPE"] = string(v)
+					server["CONTENT_TYPE"] = string(value)
 				}
 			} else {
 				server["CONTENT_TYPE"] = "multipart/form-data"
-				//httpPostBoundary = "--" + string(matches[1])
+				httpPostBoundary = "--" + string(matches[0])
 			}
 		// content-length.
 		case "CONTENT_LENGTH":
 			server["CONTENT_LENGTH"] = string(value)
 		// upgrade.
 		case "upgrade":
+		// query_string.
+		case "REFERER":
+			values, _ := url.Parse(string(v))
+			server["QUERY_STRING"] = values.Query().Encode()
 		default:
 		}
 	}
@@ -231,23 +243,37 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 		h.gzip = true
 	}
 
-	// parse post
+	// parse post.
 	if server["REQUEST_METHOD"] == "POST" {
 		if server["CONTENT_TYPE"] != "" {
 			switch server["CONTENT_TYPE"] {
 			case "multipart/form-data":
+				h.parseUploadFile(body, httpPostBoundary)
 			case "application/json":
 				err := json.Unmarshal(body, &h.post)
 				if err != nil {
 					lib.Warn("decode data of post error: %v", err)
 				}
 			case "application/x-www-form-urlencoded":
+				*h.post, _ = url.ParseQuery(string(body))
 			}
 		}
 	}
 
-	fmt.Println(server)
-	return []byte{1}
+	result, err := json.Marshal(map[string]interface{}{
+		"server": server,
+		"post":   h.post,
+	})
+	if err != nil {
+		lib.Warn("Unable marshal data, err: %v", err)
+		return []byte{}
+	}
+	return result
+}
+
+// parseUploadFile parse file.
+func (h *Http) parseUploadFile(body []byte, httpPostBoundary string) {
+
 }
 
 // getRequestSize get whole size of the request.
@@ -262,8 +288,13 @@ func (h *Http) getRequestSize(header []byte, method string) int {
 	if matches != nil {
 		contentLength := bytes.Trim(bytes.Split(matches[0], []byte(":"))[1], " ")
 		v, _ := strconv.ParseInt(string(contentLength), 10, 32)
-		return int(v) + 4
+		return len(header) + int(v) + 4
 	}
 
 	return 0
+}
+
+// NewHttpProtocol
+func NewHttpProtocol() *Http {
+	return &Http{}
 }

@@ -23,7 +23,12 @@ type UdpConnection struct {
 // Send send data on the connection.
 func (u *UdpConnection) Send(buffer string, raw bool) interface{} {
 	if raw == false && u.Protocol != nil {
-		buffer := u.Protocol.Encode([]byte(buffer))
+		switch result := u.Protocol.Encode([]byte(buffer)).(type) {
+		case []byte:
+			buffer = string(result)
+		case string:
+			buffer = result
+		}
 		if len(buffer) == 0 {
 			return nil
 		}

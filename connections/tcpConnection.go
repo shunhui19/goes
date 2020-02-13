@@ -103,8 +103,14 @@ func (t *TcpConnection) Send(buffer string, raw bool) interface{} {
 	}
 
 	// try to call protocol::encode(send_buffer) before sending into the application send buffer.
+	// every protocol maybe return different type after encode func.
 	if raw == false && t.Protocol != nil {
-		buffer = string(t.Protocol.Encode([]byte(buffer)))
+		switch result := t.Protocol.Encode([]byte(buffer)).(type) {
+		case []byte:
+			buffer = string(result)
+		case string:
+			buffer = result
+		}
 		if len(buffer) == 0 {
 			return nil
 		}

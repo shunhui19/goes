@@ -4,7 +4,8 @@ package protocols
 
 type Protocol interface {
 	// Encode encode package before send to client.
-	Encode(data []byte) []byte
+	// The type of return is different for each protocol.
+	Encode(data []byte) interface{}
 	// Decode decode package and emit.
 	Decode(recvBuffer []byte) []byte
 	// Input check the integrity of package.

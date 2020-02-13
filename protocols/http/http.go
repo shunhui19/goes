@@ -1,12 +1,13 @@
 // http this simple http protocol.
 // Only supports some methods, including: get, post, put, head, options and delete, etc..
-package protocols
+package http
 
 import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"goes/lib"
+	"goes/protocols"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -90,7 +91,7 @@ func (h *Http) GetPost() url.Values {
 func (h *Http) Input(recvBuffer []byte) interface{} {
 	position := bytes.IndexAny(recvBuffer, "\r\n\r\n")
 	if position == -1 {
-		if len(recvBuffer) >= MaxPackageSize {
+		if len(recvBuffer) >= protocols.MaxPackageSize {
 			return false
 		}
 		return 0
@@ -147,8 +148,6 @@ func (h *Http) Encode(data []byte) interface{} {
 
 	// header.
 	header += "Server: Goes/0.1" + "\r\nContent-Length: " + strconv.Itoa(len(data)) + "\r\n\r\n"
-
-	// save session.
 
 	// the whole http package.
 	return header + string(data)

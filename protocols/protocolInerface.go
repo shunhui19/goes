@@ -2,6 +2,8 @@
 // you can define custom protocol through implement three method.
 package protocols
 
+const MaxPackageSize = 104856
+
 type Protocol interface {
 	// Encode encode package before send to client.
 	// The type of return is different for each protocol.

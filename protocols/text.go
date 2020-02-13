@@ -5,8 +5,6 @@ import (
 	"bytes"
 )
 
-const MaxPackageSize = 104856
-
 type Text struct {
 }
 

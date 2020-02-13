@@ -1,4 +1,5 @@
-// http protocol.
+// http this simple http protocol.
+// Only supports some methods, including: get, post, put, head, options and delete, etc..
 package protocols
 
 import (
@@ -65,7 +66,6 @@ var httpCode = map[int]string{
 
 // Http struct of http.
 type Http struct {
-	instance *Http
 	// header header key-value.
 	header               map[string]interface{}
 	gzip                 bool
@@ -107,8 +107,8 @@ func (h *Http) Input(recvBuffer []byte) interface{} {
 	return 0
 }
 
-// Encode http encode.
-func (h *Http) Encode(data []byte) []byte {
+// Encode http encode, the type of return value is string.
+func (h *Http) Encode(data []byte) interface{} {
 	// default http-code.
 	var header string
 	if _, ok := h.header["Http-Code"]; !ok {
@@ -151,12 +151,11 @@ func (h *Http) Encode(data []byte) []byte {
 	// save session.
 
 	// the whole http package.
-	return append([]byte(header), data...)
+	return header + string(data)
 }
 
 // Decode parse POST, GET, COOKIE.
 func (h *Http) Decode(recvBuffer []byte) []byte {
-	lib.Info("recvBuff: %v", string(recvBuffer))
 	if h.header == nil {
 		h.header = make(map[string]interface{})
 	}
@@ -164,7 +163,6 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 		h.post = new(url.Values)
 	}
 	h.header["Connection"] = "Connection: keep-alive"
-	//h.instance = &Http{}
 	server := map[string]interface{}{
 		"QUERY_STRING":         "",
 		"REQUEST_METHOD":       "",

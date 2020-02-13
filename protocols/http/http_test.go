@@ -1,6 +1,9 @@
 package protocols
 
-import "testing"
+import (
+	"goes/protocols/http"
+	"testing"
+)
 
 func TestHttp_getRequestSize(t *testing.T) {
 	type args struct {
@@ -21,7 +24,7 @@ func TestHttp_getRequestSize(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h := &Http{}
+			h := &http.Http{}
 			if got := h.getRequestSize(tt.args.header, tt.args.method); got != tt.want {
 				t.Errorf("getRequestSize() = %v, want %v", got, tt.want)
 			}
@@ -41,8 +44,19 @@ func TestHttp_Decode(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
-			h := &Http{}
+			h := &http.Http{}
 			h.Decode(tt.args.packet)
 		})
+	}
+}
+
+func TestHttp_Encode(t *testing.T) {
+	type args struct {
+		h http.Http
+	}
+	tests := []struct {
+		args
+	}{
+		{http.Http{header: map[string]interface{}{"Content-Type": "text/html"}, gzip: false}},
 	}
 }

@@ -30,8 +30,8 @@ func (t *Text) Decode(buffer []byte) []byte {
 	return bytes.TrimRight(buffer, "\n")
 }
 
-// Encode encode the buffer.
-func (t *Text) Encode(buffer []byte) []byte {
+// Encode encode the buffer, the type of return value is []byte.
+func (t *Text) Encode(buffer []byte) interface{} {
 	return bytes.Join([][]byte{buffer, []byte("\n")}, []byte(""))
 }
 

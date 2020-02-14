@@ -161,12 +161,6 @@ func (h *Http) Encode(data []byte) interface{} {
 
 // Decode parse POST, GET, COOKIE.
 func (h *Http) Decode(recvBuffer []byte) []byte {
-	if h.header == nil {
-		h.header = make(map[string]interface{})
-	}
-	if h.post == nil {
-		h.post = &url.Values{}
-	}
 	h.header["Connection"] = "Connection: keep-alive"
 	server := map[string]interface{}{
 		"QUERY_STRING":         "",
@@ -277,9 +271,6 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 
 // parseUploadFile parse file.
 func (h *Http) parseUploadFile(body []byte, httpPostBoundary string) {
-	if len(h.files) == 0 {
-		h.files = make(map[int]map[string]interface{})
-	}
 
 	// remove the last boundary's '--\r\n' char.
 	body = body[:len(body)-(len(httpPostBoundary)+4)]
@@ -354,5 +345,9 @@ func (h *Http) getRequestSize(header []byte, method string) int {
 
 // NewHttpProtocol
 func NewHttpProtocol() *Http {
-	return &Http{}
+	return &Http{
+		files:  make(map[int]map[string]interface{}),
+		post:   &url.Values{},
+		header: map[string]interface{}{},
+	}
 }

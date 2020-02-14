@@ -65,10 +65,15 @@ var httpCode = map[int]string{
 	505: "Http Version Not Supported",
 }
 
+// Header Header key-value.
+type header map[string]interface{}
+
+// files the post file.
+type files map[int]map[string]interface{}
+
 // Http struct of http.
 type Http struct {
-	// header header key-value.
-	header               map[string]interface{}
+	header               header
 	gzip                 bool
 	sessionPath          string
 	sessionName          string
@@ -77,9 +82,10 @@ type Http struct {
 	sessionStarted       bool
 	// sessionFile session file.
 	sessionFile string
-	// post post data.
-	//post map[string]interface{}
+	// post post form data.
 	post *url.Values
+	// files post file.
+	files files
 }
 
 // GetPost return the data of post method.
@@ -146,7 +152,7 @@ func (h *Http) Encode(data []byte) interface{} {
 		data = buf.Bytes()
 	}
 
-	// header.
+	// Header.
 	header += "Server: Goes/0.1" + "\r\nContent-Length: " + strconv.Itoa(len(data)) + "\r\n\r\n"
 
 	// the whole http package.
@@ -159,7 +165,7 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 		h.header = make(map[string]interface{})
 	}
 	if h.post == nil {
-		h.post = new(url.Values)
+		h.post = &url.Values{}
 	}
 	h.header["Connection"] = "Connection: keep-alive"
 	server := map[string]interface{}{
@@ -182,14 +188,14 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 		"REQUEST_TIME":         time.Now().Format("Mon, 02 Jan 2006 15:04:05 GMT"),
 	}
 
-	// parse header.
+	// parse Header.
 	packages := bytes.SplitN(recvBuffer, []byte("\r\n\r\n"), 2)
 	header, body := packages[0], packages[1]
 	headerData := bytes.Split(header, []byte("\r\n"))
 	headerData2 := bytes.Split(headerData[0], []byte(" "))
 	server["REQUEST_METHOD"], server["REQUEST_URL"], server["REQUEST_PROTOCOL"] = string(headerData2[0]), string(headerData2[1]), string(headerData2[2])
 
-	// parse general header.
+	// parse general Header.
 	httpPostBoundary := ""
 	for i, v := range headerData {
 		if i == 0 || len(v) == 0 {
@@ -222,7 +228,7 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 				}
 			} else {
 				server["CONTENT_TYPE"] = "multipart/form-data"
-				httpPostBoundary = "--" + string(matches[0])
+				httpPostBoundary = "--" + string(bytes.Split(matches[0], []byte("="))[1])
 			}
 		// content-length.
 		case "CONTENT_LENGTH":
@@ -260,6 +266,7 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 	result, err := json.Marshal(map[string]interface{}{
 		"server": server,
 		"post":   h.post,
+		"file":   h.files,
 	})
 	if err != nil {
 		lib.Warn("Unable marshal data, err: %v", err)
@@ -270,7 +277,61 @@ func (h *Http) Decode(recvBuffer []byte) []byte {
 
 // parseUploadFile parse file.
 func (h *Http) parseUploadFile(body []byte, httpPostBoundary string) {
+	if len(h.files) == 0 {
+		h.files = make(map[int]map[string]interface{})
+	}
 
+	// remove the last boundary's '--\r\n' char.
+	body = body[:len(body)-(len(httpPostBoundary)+4)]
+
+	boundaryDataArray := bytes.Split(body, []byte(httpPostBoundary+"\r\n"))
+	if len(boundaryDataArray[0]) == 0 {
+		boundaryDataArray = boundaryDataArray[1:]
+	}
+
+	k := -1
+	for _, boundaryBuffer := range boundaryDataArray {
+		tmp := bytes.SplitN(boundaryBuffer, []byte("\r\n\r\n"), 2)
+		boundaryHeaderBuffer := tmp[0]
+		boundaryValue := tmp[1]
+		// remove \r\n from the end of buffer.
+		boundaryValue = boundaryValue[:len(boundaryValue)-2]
+		for _, item := range bytes.Split(boundaryHeaderBuffer, []byte("\r\n")) {
+			// v eg: Content-Disposition: form-data; name=file; filename=frank.txt
+			keyValue := bytes.SplitN(item, []byte(":"), 2)
+			headerKey := string(bytes.ToLower(keyValue[0]))
+			headerValue := keyValue[1]
+			switch headerKey {
+			case "content-disposition":
+				re := regexp.MustCompile("name=\\S+; filename=\\S+")
+				matches := re.FindSubmatch(headerValue)
+				// the data of post file.
+				if matches != nil {
+					tmp := bytes.Split(matches[0], []byte(";"))
+					if h.files[k] == nil {
+						h.files[k] = make(map[string]interface{})
+					}
+					h.files[k]["name"] = string(bytes.SplitN(tmp[0], []byte("="), 2)[1])
+					h.files[k]["fileName"] = string(bytes.SplitN(tmp[1], []byte("="), 2)[1])
+					h.files[k]["fileData"] = string(boundaryValue)
+					h.files[k]["fileSize"] = len(boundaryValue)
+					// the data of post filed.
+				} else {
+					re := regexp.MustCompile("name=\\S+")
+					matches := re.FindSubmatch(headerValue)
+					keyValue := bytes.SplitN(matches[0], []byte("="), 2)
+					h.post.Add(string(keyValue[1]), string(boundaryValue))
+
+				}
+			case "content-type":
+				if h.files[k] == nil {
+					h.files[k] = make(map[string]interface{})
+				}
+				h.files[k]["fileType"] = string(headerValue)
+			}
+		}
+		k++
+	}
 }
 
 // getRequestSize get whole size of the request.

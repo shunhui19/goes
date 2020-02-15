@@ -272,16 +272,9 @@ func (t *TCPConnection) Read() {
 
 	for {
 	READ:
-		// determine the size of receive buf in every package.
-		//err := binary.Read(*t.socket, binary.BigEndian, &size)
-		//if err != nil {
-		//	lib.Warn("determine the size error: %v", err.Error())
-		//}
 		buf := make([]byte, 1024)
-
 		n, err := (*t.socket).Read(buf)
 		if err != nil || err == io.EOF {
-			//lib.Warn(err.Error())
 			t.Close("server close client")
 			return
 		}

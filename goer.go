@@ -495,6 +495,7 @@ func (g *Goer) acceptTCPConnection() {
 		go func() {
 			defer connection.Close("")
 			connection.Read()
+			// waiting for reload signal and one by one close old client.
 			g.gracefulWait.Done()
 		}()
 	}

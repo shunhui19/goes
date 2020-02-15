@@ -272,6 +272,7 @@ func (t *TCPConnection) Read() {
 
 	for {
 	READ:
+		// this need to optimize.
 		buf := make([]byte, 1024)
 		n, err := (*t.socket).Read(buf)
 		if err != nil || err == io.EOF {

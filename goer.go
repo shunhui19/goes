@@ -22,16 +22,16 @@ import (
 const (
 	// Version the version of goes.
 	Version = 0.1
-	// MaxUdpPackageSize max udp package size.
-	MaxUdpPackageSize = 65536
+	// MaxUDPPackageSize max udp package size.
+	MaxUDPPackageSize = 65536
 
-	// Status the status of starting.
+	// StatusStarting the status of starting.
 	StatusStarting = 1
-	// Status the status of running.
+	// StatusRunning the status of running.
 	StatusRunning = 2
-	// Status the status of shutdown.
+	// StatusShutdown the status of shutdown.
 	StatusShutdown = 4
-	// Status the status of reloading.
+	// StatusReloading the status of reloading.
 	StatusReloading = 8
 )
 
@@ -46,6 +46,7 @@ var buildInTransports = []map[string]string{
 	{"ssl": "tcp"},
 }
 
+// Goer the main-goroutine server.
 type Goer struct {
 	// Name the name of main goroutine.
 	//Name string
@@ -83,8 +84,8 @@ type Goer struct {
 	Connections sync.Map
 	// gracefulWait wait for connections graceful exit which belongs to old process.
 	gracefulWait *sync.WaitGroup
-	// connectionId unique connection id.
-	connectionId int
+	// connectionID unique connection id.
+	connectionID int
 	// status current status.
 	status int
 	// OnConnect emitted when a socket connection is successfully established.
@@ -455,14 +456,14 @@ func (g *Goer) listen() {
 func (g *Goer) resumeAccept() {
 	switch g.Transport {
 	case "tcp", "tcp4", "tcp6", "unix", "unixpacket", "ssl":
-		g.acceptTcpConnection()
+		g.acceptTCPConnection()
 	case "udp", "upd4", "udp6", "unixgram":
-		g.acceptUdpConnection()
+		g.acceptUDPConnection()
 	}
 }
 
-// acceptTcpConnection accept a tcp connection.
-func (g *Goer) acceptTcpConnection() {
+// acceptTCPConnection accept a tcp connection.
+func (g *Goer) acceptTCPConnection() {
 	for {
 		newSocket, err := g.mainSocket.(*net.TCPListener).Accept()
 		if err != nil {
@@ -474,7 +475,7 @@ func (g *Goer) acceptTcpConnection() {
 			lib.Error("unAccept client socket, reason: %s", err.Error())
 			continue
 		}
-		connection := connections.NewTcpConnection(&newSocket, newSocket.RemoteAddr().String())
+		connection := connections.NewTCPConnection(&newSocket, newSocket.RemoteAddr().String())
 		connection.Transport = g.Transport
 		connection.Protocol = g.Protocol
 		connection.OnMessage = g.OnMessage
@@ -483,7 +484,7 @@ func (g *Goer) acceptTcpConnection() {
 		connection.OnBufferDrain = g.OnBufferDrain
 		connection.OnBuffFull = g.OnBufferFull
 		// store all client connection.
-		g.Connections.Store(g.generateConnectionId(), connection)
+		g.Connections.Store(g.generateConnectionID(), connection)
 
 		// trigger OnConnect if is set.
 		if g.OnConnect != nil {
@@ -499,17 +500,17 @@ func (g *Goer) acceptTcpConnection() {
 	}
 }
 
-// acceptUdpConnection accept a udp package.
-func (g *Goer) acceptUdpConnection() {
+// acceptUDPConnection accept a udp package.
+func (g *Goer) acceptUDPConnection() {
 	for {
-		recvBuffer := make([]byte, MaxUdpPackageSize)
+		recvBuffer := make([]byte, MaxUDPPackageSize)
 		n, addr, err := g.mainSocket.(net.PacketConn).ReadFrom(recvBuffer)
 		if err != nil {
 			lib.Warn("ReadFrom the %d data of udp error: %v", n, err)
 			return
 		}
 		go func() {
-			connection := connections.NewUdpConnection(g.mainSocket.(net.PacketConn), addr)
+			connection := connections.NewUDPConnection(g.mainSocket.(net.PacketConn), addr)
 			connection.Protocol = g.Protocol
 			if g.OnMessage != nil {
 				if g.Protocol != nil {
@@ -540,8 +541,8 @@ func (g *Goer) acceptUdpConnection() {
 }
 
 // RemoveConnection delete connection from Connections store.
-func (g *Goer) RemoveConnection(connectionId int) {
-	g.Connections.Delete(connectionId)
+func (g *Goer) RemoveConnection(connectionID int) {
+	g.Connections.Delete(connectionID)
 }
 
 // NewGoer create object of Goer with socketName, application layer protocol and transport layer protocol,
@@ -554,25 +555,25 @@ func NewGoer(socketName string, applicationProtocol protocols.Protocol, transpor
 	return &Goer{socketName: socketName, Protocol: applicationProtocol, Transport: transportProtocol, gracefulWait: &sync.WaitGroup{}}
 }
 
-// generateConnectionId generate unique connection id.
-func (g *Goer) generateConnectionId() int {
+// generateConnectionID generate unique connection id.
+func (g *Goer) generateConnectionID() int {
 	maxUnsignedInt := int(2147483647)
-	if g.connectionId >= maxUnsignedInt {
-		g.connectionId = 1
+	if g.connectionID >= maxUnsignedInt {
+		g.connectionID = 1
 	}
-	for g.connectionId < maxUnsignedInt {
+	for g.connectionID < maxUnsignedInt {
 		// start from 1.
-		if g.connectionId == 0 {
-			g.connectionId++
+		if g.connectionID == 0 {
+			g.connectionID++
 			continue
 		}
 		// judge current id whether has used.
-		if _, ok := g.Connections.Load(g.connectionId); !ok {
+		if _, ok := g.Connections.Load(g.connectionID); !ok {
 			break
 		}
-		g.connectionId++
+		g.connectionID++
 	}
-	return g.connectionId
+	return g.connectionID
 }
 
 // getPid get the pid value from PidFle.
@@ -587,9 +588,9 @@ func (g *Goer) getPid() (int, error) {
 			lib.Fatal("Unable to read and parse process pid found in: %v", g.PidFile)
 		}
 		return processPid, nil
-	} else {
-		return 0, fmt.Errorf("Goer not run.")
 	}
+
+	return 0, fmt.Errorf("goer not run")
 }
 
 // gracefulWaitTimeout set graceful timeout.

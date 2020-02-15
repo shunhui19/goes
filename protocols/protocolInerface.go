@@ -2,6 +2,7 @@
 // you can define custom protocol through implement three method.
 package protocols
 
+// MaxPackageSize the maximum size of package.
 const MaxPackageSize = 104856
 
 type Protocol interface {

@@ -5,6 +5,7 @@ import (
 	"bytes"
 )
 
+// Text text struct.
 type Text struct {
 }
 

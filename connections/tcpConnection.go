@@ -1,4 +1,4 @@
-// TcpConnection.
+// TCPConnection.
 // note: in OSX system, the default max concurrency is limited to 128,
 // so when your concurrency number more than 128 will occur error: connect: connection reset by peer.
 // you should by setting: 'sysctl -w kern.ipc.somaxconn=xxx', xxx is the max currency number.
@@ -21,11 +21,11 @@ const (
 	ReadBufferSize = 65535
 	// MaxSendBufferSize maximum size of send buffer.
 	MaxSendBufferSize = 104856
-	// MaxSendBufferSize default maximum size of send buffer.
+	// DefaultMaxSendBufferSize default maximum size of send buffer.
 	DefaultMaxSendBufferSize = 104856
 	// MaxPackageSize maximum size of acceptable buffer.
 	MaxPackageSize = 104856
-	// MaxPackageSize default maximum size of acceptable buffer.
+	// DefaultMaxPackageSize default maximum size of acceptable buffer.
 	DefaultMaxPackageSize = 1048560
 
 	// StatusInitial initial status of connection.
@@ -40,8 +40,8 @@ const (
 	StatusClosed = 8
 )
 
-// TcpConnection struct.
-type TcpConnection struct {
+// TCPConnection struct.
+type TCPConnection struct {
 	// baseConnection.
 	baseConnection BaseConnection
 	// OnMessage emitted when data is received.
@@ -58,8 +58,8 @@ type TcpConnection struct {
 	Transport string
 	// Protocol application layer protocol.
 	Protocol protocols.Protocol
-	// Id the id of connection.
-	Id int
+	// ID the id of connection.
+	ID int
 	// idRecorder id recorder.
 	idRecorder int
 	// MaxSendBufferSize set the maximum send buffer size for the current connection.
@@ -89,7 +89,7 @@ type TcpConnection struct {
 }
 
 // Send send data on the connection.
-// if connection is closing or closed, return.
+// if connection is closing or closed, return false.
 // if connection have not been established, then save encode data info application send buffer,
 // otherwise direct send encode of data into system socket send buffer.
 //
@@ -97,7 +97,7 @@ type TcpConnection struct {
 // if return true, indicate the message already send to operating system layer socket send buffer.
 // else return false, send fail.
 // return nil indicate the message already send to application send buffer, waiting for into operating system socket send buffer.
-func (t *TcpConnection) Send(buffer string, raw bool) interface{} {
+func (t *TCPConnection) Send(buffer string, raw bool) interface{} {
 	if t.status == StatusClosing || t.status == StatusClosed {
 		return false
 	}
@@ -137,7 +137,7 @@ func (t *TcpConnection) Send(buffer string, raw bool) interface{} {
 			if t.socket == nil || err == io.EOF {
 				t.baseConnection.SendFail++
 				if t.OnError != nil {
-					t.OnError(2, "client closed!")
+					t.OnError(2, "client is closed!")
 				}
 				t.destroy()
 				return false
@@ -157,7 +157,7 @@ func (t *TcpConnection) Send(buffer string, raw bool) interface{} {
 			if t.socket == nil || err == io.EOF {
 				t.baseConnection.SendFail++
 				if t.OnError != nil {
-					t.OnError(2, "client closed!")
+					t.OnError(2, "client is closed!")
 				}
 				t.destroy()
 				return false
@@ -180,7 +180,7 @@ func (t *TcpConnection) Send(buffer string, raw bool) interface{} {
 }
 
 // bufferIsFull whether send buffer is full.
-func (t *TcpConnection) bufferIsFull() bool {
+func (t *TCPConnection) bufferIsFull() bool {
 	if len(t.sendBuffer) >= MaxSendBufferSize {
 		if t.OnError != nil {
 			lib.Warn("code: %d, msg: %s", 2, "send buffer full and drop package")
@@ -192,7 +192,7 @@ func (t *TcpConnection) bufferIsFull() bool {
 }
 
 // checkBufferWillFull check whether the send buffer will be full.
-func (t *TcpConnection) checkBufferWillFull() {
+func (t *TCPConnection) checkBufferWillFull() {
 	if len(t.sendBuffer) >= MaxSendBufferSize {
 		if t.OnBuffFull != nil {
 			t.OnBuffFull()
@@ -201,15 +201,15 @@ func (t *TcpConnection) checkBufferWillFull() {
 }
 
 // Close close connection.
-func (t *TcpConnection) Close(data string) {
+func (t *TCPConnection) Close(data string) {
 	if t.status == StatusClosing || t.status == StatusClosed {
 		return
-	} else {
-		if data != "" {
-			t.Send(data, false)
-		}
-		t.status = StatusClosing
 	}
+
+	if data != "" {
+		t.Send(data, false)
+	}
+	t.status = StatusClosing
 	t.destroy()
 	//if len(t.sendBuffer) == 0 {
 	//} else {
@@ -217,13 +217,13 @@ func (t *TcpConnection) Close(data string) {
 	//}
 }
 
-// GetRemoteIp get remote ip.
-func (t *TcpConnection) GetRemoteIp() string {
+// GetRemoteIP get remote ip.
+func (t *TCPConnection) GetRemoteIP() string {
 	return strings.Split(t.remoteAddress, ":")[0]
 }
 
 // GetRemotePort get remote port.
-func (t *TcpConnection) GetRemotePort() int {
+func (t *TCPConnection) GetRemotePort() int {
 	if t.remoteAddress != "" {
 		port, _ := strconv.Atoi(strings.Split(t.remoteAddress, ":")[1])
 		return port
@@ -232,39 +232,39 @@ func (t *TcpConnection) GetRemotePort() int {
 }
 
 // GetRemoteAddress get remote address, the format is like this http://127.0.0.1:8080.
-func (t *TcpConnection) GetRemoteAddress() string {
+func (t *TCPConnection) GetRemoteAddress() string {
 	return t.remoteAddress
 }
 
-// GetLocalIp get local ip.
-func (t *TcpConnection) GetLocalIp() string {
+// GetLocalIP get local ip.
+func (t *TCPConnection) GetLocalIP() string {
 	return strings.Split((*t.socket).LocalAddr().String(), ":")[0]
 }
 
 // GetLocalPort get local port.
-func (t *TcpConnection) GetLocalPort() int {
+func (t *TCPConnection) GetLocalPort() int {
 	addr := strings.Split((*t.socket).LocalAddr().String(), ":")
 	port, _ := strconv.Atoi(addr[1])
 	return port
 }
 
 // GetLocalAddress get remote address, the format is like this http://127.0.0.1:8080.
-func (t *TcpConnection) GetLocalAddress() string {
+func (t *TCPConnection) GetLocalAddress() string {
 	return (*t.socket).LocalAddr().String()
 }
 
 // GetSendBufferQueueSize get send buffer queue size.
-func (t *TcpConnection) GetSendBufferQueueSize() int {
+func (t *TCPConnection) GetSendBufferQueueSize() int {
 	return len(t.sendBuffer)
 }
 
 // GetRecvBufferQueueSize get recv buffer queue size.
-func (t *TcpConnection) GetRecvBufferQueueSize() int {
+func (t *TCPConnection) GetRecvBufferQueueSize() int {
 	return len(t.recvBuffer)
 }
 
 // Read read data from socket.
-func (t *TcpConnection) Read() {
+func (t *TCPConnection) Read() {
 	// ssl handle.
 	if t.Transport == "ssl" {
 
@@ -290,11 +290,10 @@ func (t *TcpConnection) Read() {
 		if n == 0 {
 			t.destroy()
 			return
-		} else {
-			t.byteRead += n
-			t.recvBuffer = append(t.recvBuffer, buf[:n]...)
 		}
 
+		t.byteRead += n
+		t.recvBuffer = append(t.recvBuffer, buf[:n]...)
 		// if the application layer protocol has been set up.
 		if t.Protocol != nil {
 			for len(t.recvBuffer) > 0 {
@@ -367,7 +366,7 @@ func (t *TcpConnection) Read() {
 }
 
 // write write data into socket.
-func (t *TcpConnection) write() {
+func (t *TCPConnection) write() {
 	n, _ := (*t.socket).Write(t.sendBuffer)
 	if n == len(t.sendBuffer) {
 		t.byteWrite += n
@@ -391,7 +390,7 @@ func (t *TcpConnection) write() {
 }
 
 // destroy destroy connection.
-func (t *TcpConnection) destroy() {
+func (t *TCPConnection) destroy() {
 	if t.status == StatusClosed {
 		return
 	}
@@ -414,16 +413,16 @@ func (t *TcpConnection) destroy() {
 	if t.status == StatusClosed {
 		// remove from goer.connections.
 		//if t.Goer != nil {
-		//	t.Goer.RemoveConnection(t.Id)
+		//	t.Goer.RemoveConnection(t.ID)
 		//}
 	}
 }
 
-// NewTcpConnection new a tcp connection.
-func NewTcpConnection(socket *net.Conn, remoteAddress string) *TcpConnection {
-	tcp := &TcpConnection{}
+// NewTCPConnection new a tcp connection.
+func NewTCPConnection(socket *net.Conn, remoteAddress string) *TCPConnection {
+	tcp := &TCPConnection{}
 	tcp.baseConnection.ConnectionCount++
-	tcp.Id++
+	tcp.ID++
 	tcp.idRecorder++
 	if tcp.idRecorder == math.MaxInt32 {
 		tcp.idRecorder = 0
@@ -434,6 +433,6 @@ func NewTcpConnection(socket *net.Conn, remoteAddress string) *TcpConnection {
 	tcp.recvBuffer = make([]byte, 0, ReadBufferSize)
 	tcp.status = StatusEstablished
 	tcp.remoteAddress = remoteAddress
-	//tcp.connections.Store(tcp.Id, tcp)
+	//tcp.connections.Store(tcp.ID, tcp)
 	return tcp
 }

@@ -82,7 +82,7 @@ type Goer struct {
 	// rootPath root path.
 	rootPath string
 	// Connections store all Connections of client.
-	Connections sync.Map
+	Connections connections.CStore
 	// gracefulWait wait for connections graceful exit which belongs to old process.
 	gracefulWait *sync.WaitGroup
 	// connectionID unique connection id.
@@ -487,8 +487,10 @@ func (g *Goer) acceptTCPConnection() {
 		connection.OnError = g.OnError
 		connection.OnBufferDrain = g.OnBufferDrain
 		connection.OnBufferFull = g.OnBufferFull
+		connection.Connections = g.Connections
+
 		// store all client connection.
-		g.Connections.Store(connection.ID, &connection)
+		g.Connections.Set(connection)
 
 		// trigger OnConnect if is set.
 		if g.OnConnect != nil {
@@ -545,11 +547,6 @@ func (g *Goer) acceptUDPConnection() {
 	}
 }
 
-// RemoveConnection delete connection from Connections store.
-func (g *Goer) RemoveConnection(connectionID int) {
-	g.Connections.Delete(connectionID)
-}
-
 // NewGoer create object of Goer with socketName, application layer protocol and transport layer protocol,
 // if applicationProtocol is empty.
 func NewGoer(socketName string, applicationProtocol protocols.Protocol, transportProtocol string) *Goer {
@@ -557,7 +554,13 @@ func NewGoer(socketName string, applicationProtocol protocols.Protocol, transpor
 		lib.Fatal("the socket address can not be empty")
 	}
 
-	return &Goer{socketName: socketName, Protocol: applicationProtocol, Transport: transportProtocol, gracefulWait: &sync.WaitGroup{}}
+	return &Goer{
+		socketName:   socketName,
+		Protocol:     applicationProtocol,
+		Transport:    transportProtocol,
+		gracefulWait: &sync.WaitGroup{},
+		Connections:  connections.NewConnStore(),
+	}
 }
 
 // generateConnectionID generate unique connection id.
@@ -573,7 +576,7 @@ func (g *Goer) generateConnectionID() int {
 			continue
 		}
 		// judge current id whether has used.
-		if _, ok := g.Connections.Load(g.connectionID); !ok {
+		if _, ok := g.Connections.Get(g.connectionID); !ok {
 			break
 		}
 		g.connectionID++

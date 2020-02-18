@@ -13,7 +13,6 @@ import (
 	"net"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 const (
@@ -74,8 +73,8 @@ type TCPConnection struct {
 	recvBuffer []byte
 	// sendBuffer send buffer.
 	sendBuffer []byte
-	// connections all connection instances, key is connection id and value is *net.Conn.
-	connections sync.Map
+	// Connections all connection instances, key is connection id and value is *net.Conn.
+	Connections CStore
 	// status connection status.
 	status int
 	// byteRead bytes read.
@@ -400,11 +399,8 @@ func (t *TCPConnection) destroy() {
 	}
 
 	if t.status == StatusClosed {
+		t.Connections.Del(t.ID)
 		t.OnMessage, t.OnError, t.OnClose, t.OnBufferDrain, t.OnBufferFull = nil, nil, nil, nil, nil
-		// remove from goer.connections.
-		//if t.Goer != nil {
-		//	t.Goer.RemoveConnection(t.ID)
-		//}
 	}
 }
 
@@ -423,6 +419,5 @@ func NewTCPConnection(socket *net.Conn, remoteAddress string) *TCPConnection {
 	tcp.recvBuffer = make([]byte, 0, ReadBufferSize)
 	tcp.status = StatusEstablished
 	tcp.remoteAddress = remoteAddress
-	//tcp.connections.Store(tcp.ID, tcp)
 	return tcp
 }

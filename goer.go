@@ -6,6 +6,7 @@ import (
 	"goes/lib"
 	"goes/protocols"
 	"io/ioutil"
+	"math"
 	"net"
 	"os"
 	"os/exec"
@@ -406,6 +407,8 @@ func (g *Goer) stop() {
 		connection.(connections.ConnectionInterface).Close("")
 		return true
 	})
+
+	g.OnMessage, g.OnError, g.OnClose, g.OnBufferDrain, g.OnBufferFull = nil, nil, nil, nil, nil
 }
 
 // listen create a listen socket.
@@ -476,15 +479,16 @@ func (g *Goer) acceptTCPConnection() {
 			continue
 		}
 		connection := connections.NewTCPConnection(&newSocket, newSocket.RemoteAddr().String())
+		connection.ID = g.generateConnectionID()
 		connection.Transport = g.Transport
 		connection.Protocol = g.Protocol
 		connection.OnMessage = g.OnMessage
 		connection.OnClose = g.OnClose
 		connection.OnError = g.OnError
 		connection.OnBufferDrain = g.OnBufferDrain
-		connection.OnBuffFull = g.OnBufferFull
+		connection.OnBufferFull = g.OnBufferFull
 		// store all client connection.
-		g.Connections.Store(g.generateConnectionID(), connection)
+		g.Connections.Store(connection.ID, &connection)
 
 		// trigger OnConnect if is set.
 		if g.OnConnect != nil {
@@ -558,7 +562,7 @@ func NewGoer(socketName string, applicationProtocol protocols.Protocol, transpor
 
 // generateConnectionID generate unique connection id.
 func (g *Goer) generateConnectionID() int {
-	maxUnsignedInt := int(2147483647)
+	maxUnsignedInt := math.MaxInt32
 	if g.connectionID >= maxUnsignedInt {
 		g.connectionID = 1
 	}

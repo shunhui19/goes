@@ -2,7 +2,7 @@
 // note: in OSX system, the default max concurrency is limited to 128,
 // so when your concurrency number more than 128 will occur error: connect: connection reset by peer.
 // you should by setting: 'sysctl -w kern.ipc.somaxconn=xxx', xxx is the max currency number.
-// link https://github.com/golang/go/issues/20960 .
+// link https://github.com/golang/go/issues/20960.
 package connections
 
 import (
@@ -50,8 +50,8 @@ type TCPConnection struct {
 	OnError func(code int, msg string)
 	// OnClose emitted when the other end of the socket send a FIN package.
 	OnClose func()
-	// OnBuffFull emitted when the send buffer becomes full.
-	OnBuffFull func()
+	// OnBufferFull emitted when the send buffer becomes full.
+	OnBufferFull func()
 	// OnBufferDrain emitted when the send buffer becomes empty.
 	OnBufferDrain func()
 	// Transport transport.
@@ -78,8 +78,6 @@ type TCPConnection struct {
 	connections sync.Map
 	// status connection status.
 	status int
-	// Goer which goer belong to.
-	//Goer *goes.Goer
 	// byteRead bytes read.
 	byteRead int
 	// byteWrite bytes written.
@@ -194,8 +192,8 @@ func (t *TCPConnection) bufferIsFull() bool {
 // checkBufferWillFull check whether the send buffer will be full.
 func (t *TCPConnection) checkBufferWillFull() {
 	if len(t.sendBuffer) >= MaxSendBufferSize {
-		if t.OnBuffFull != nil {
-			t.OnBuffFull()
+		if t.OnBufferFull != nil {
+			t.OnBufferFull()
 		}
 	}
 }
@@ -401,10 +399,8 @@ func (t *TCPConnection) destroy() {
 		t.OnClose()
 	}
 
-	// trigger OnClose func of protocol.
-
-	// whether gc ???.
 	if t.status == StatusClosed {
+		t.OnMessage, t.OnError, t.OnClose, t.OnBufferDrain, t.OnBufferFull = nil, nil, nil, nil, nil
 		// remove from goer.connections.
 		//if t.Goer != nil {
 		//	t.Goer.RemoveConnection(t.ID)

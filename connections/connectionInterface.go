@@ -20,3 +20,17 @@ type ConnectionInterface interface {
 	// GetLocalAddress get local address.
 	GetLocalAddress() string
 }
+
+// CStore the interface of store all connection.
+type CStore interface {
+	// Set store a TCPConnection.
+	Set(conn *TCPConnection)
+	// Get return a TCPConnection.
+	Get(connID int) (*TCPConnection, bool)
+	// Del remove a TCPConnection from sync.Map.
+	Del(connID int)
+	// Range calls f sequentially for each key and value present in the map.
+	Range(f func(key, value interface{}) bool)
+	// Len return the count of all TCPConnection.
+	Len() int32
+}

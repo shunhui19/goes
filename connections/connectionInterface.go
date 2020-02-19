@@ -1,8 +1,8 @@
 // connection interface.
 package connections
 
-// ConnectionInterface the method of interface.
-type ConnectionInterface interface {
+// Connection the method of interface.
+type Connection interface {
 	// Send sends data on the connection.
 	Send(data string, raw bool) interface{}
 	// Close close connection.

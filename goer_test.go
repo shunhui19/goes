@@ -31,10 +31,10 @@ func TestNewGoer(t *testing.T) {
 			go func() {
 				defer w.Done()
 				g.RunAll()
-				g.OnConnect = func(connection connections.ConnectionInterface) {
+				g.OnConnect = func(connection connections.Connection) {
 					fmt.Println("OnConnect callback.")
 				}
-				g.OnMessage = func(connection connections.ConnectionInterface, data []byte) {
+				g.OnMessage = func(connection connections.Connection, data []byte) {
 					fmt.Printf("OnMessage: %s\n", data)
 				}
 				g.OnClose = func() {

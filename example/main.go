@@ -31,18 +31,18 @@ func main() {
 	//	fmt.Printf("localPort: %d\n", connection.GetLocalPort())
 	//}
 
-	goer.OnConnect = func(connection connections.ConnectionInterface) {
+	goer.OnConnect = func(connection connections.Connection) {
 		//fmt.Println("new connection is coming")
 		//connection.Send("hello, world", false)
 	}
 
-	goer.OnMessage = func(connection connections.ConnectionInterface, data []byte) {
+	goer.OnMessage = func(connection connections.Connection, data []byte) {
 		lib.Info("client[%v], content: %v", connection.GetRemoteAddress(), string(data))
 		connection.Send("ok", false)
 
 		// send data to other client.
 		goer.Connections.Range(func(key, value interface{}) bool {
-			if c := value.(connections.ConnectionInterface); c.GetRemoteAddress() != connection.GetRemoteAddress() {
+			if c := value.(connections.Connection); c.GetRemoteAddress() != connection.GetRemoteAddress() {
 				c.Send("a new client is coming", false)
 			}
 			return true

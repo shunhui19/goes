@@ -90,9 +90,9 @@ type Goer struct {
 	// status current status.
 	status int
 	// OnConnect emitted when a socket connection is successfully established.
-	OnConnect func(connection connections.ConnectionInterface)
+	OnConnect func(connection connections.Connection)
 	// OnMessage emitted when data is received.
-	OnMessage func(connection connections.ConnectionInterface, data []byte)
+	OnMessage func(connection connections.Connection, data []byte)
 	// OnClose emitted when other end of the socket sends a FIN packet.
 	OnClose func()
 	// OnError emitted when an error occurs with connection.
@@ -367,7 +367,7 @@ func (g *Goer) reload() {
 	// the server will close all client.
 	if err := g.gracefulWaitTimeout(time.Minute); err != nil {
 		g.Connections.Range(func(key, value interface{}) bool {
-			value.(connections.ConnectionInterface).Close("server is graceful restart")
+			value.(connections.Connection).Close("server is graceful restart")
 			return true
 		})
 		lib.Fatal("Timeout when graceful")
@@ -404,7 +404,7 @@ func (g *Goer) stop() {
 
 	// close client.
 	g.Connections.Range(func(k, connection interface{}) bool {
-		connection.(connections.ConnectionInterface).Close("")
+		connection.(connections.Connection).Close("")
 		return true
 	})
 

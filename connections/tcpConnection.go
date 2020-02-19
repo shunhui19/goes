@@ -43,7 +43,7 @@ type TCPConnection struct {
 	// baseConnection.
 	baseConnection BaseConnection
 	// OnMessage emitted when data is received.
-	OnMessage func(connection ConnectionInterface, data []byte)
+	OnMessage func(connection Connection, data []byte)
 	// OnError emitted when a error occurs with connection.
 	OnError func(code int, msg string)
 	// OnClose emitted when the other end of the socket send a FIN package.

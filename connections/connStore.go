@@ -16,7 +16,7 @@ type ConnStore struct {
 
 // Set store a TCPConnection.
 func (cs *ConnStore) Set(conn *TCPConnection) {
-	if _, ok := cs.connections.LoadOrStore(conn.ID, conn); ok {
+	if _, ok := cs.connections.LoadOrStore(conn.ID, conn); !ok {
 		return
 	}
 

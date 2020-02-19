@@ -158,6 +158,13 @@ func (g *Goer) init() {
 
 // parseCommand parse command.
 func (g *Goer) parseCommand() {
+	// Note: this is only in order to test.
+	// because the command of goes server start is like: ./execFile start,
+	// so it conflict with the "go test" command when testing.
+	if strings.Contains(os.Args[0], "test") {
+		return
+	}
+
 	if len(os.Args) < 2 {
 		fmt.Printf("Usage: yourExecuteFile <command> [mode]\ncommand:\nstart\tStart goer in DEBUG mode.\n\tUse mode -d to start in DAEMON mode.\nstop\tStop goer.\nreload\tReload codes.\n")
 		os.Exit(0)

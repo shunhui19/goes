@@ -1,70 +1,82 @@
 package goes
 
 import (
+	"bytes"
 	"fmt"
 	"goes/connections"
 	"goes/protocols"
-	"sync"
+	"net"
 	"testing"
 )
 
-func TestNewGoer(t *testing.T) {
-	type args struct {
-		socketName          string
-		applicationProtocol protocols.Protocol
-		transportProtocol   string
-		daemon              bool
+var goes *Goer
+
+func init() {
+	goes = NewGoer("127.0.0.1:8080", protocols.NewTextProtocol(), "tcp")
+	goes.OnConnect = func(connection connections.Connection) {
+		fmt.Println("new client is coming")
 	}
-	tests := []struct {
-		name string
-		args args
-	}{
-		{name: "goer-tcp", args: args{"127.0.0.1:8081", nil, "tcp", true}},
-		{name: "goer-tcp4", args: args{"127.0.0.1:8082", nil, "tcp4", false}},
-		//{name: "goer-tcp6", args: args{"127.0.0.1:8083", nil, "tcp6"}},
+	goes.OnMessage = func(connection connections.Connection, data []byte) {
+		connection.Send("Request received: "+string(data), false)
 	}
-	var w sync.WaitGroup
-	for _, tt := range tests {
-		w.Add(1)
-		t.Run(tt.name, func(t *testing.T) {
-			g := NewGoer(tt.args.socketName, tt.args.applicationProtocol, tt.args.transportProtocol)
-			go func() {
-				defer w.Done()
-				g.RunAll()
-				g.OnConnect = func(connection connections.Connection) {
-					fmt.Println("OnConnect callback.")
-				}
-				g.OnMessage = func(connection connections.Connection, data []byte) {
-					fmt.Printf("OnMessage: %s\n", data)
-				}
-				g.OnClose = func() {
-					fmt.Println("OnClose")
-				}
-			}()
-		})
+	goes.OnClose = func() {
+		fmt.Println("client is closed.")
 	}
-	w.Wait()
+	go func() {
+		goes.RunAll()
+	}()
 }
 
-// test start model, debug mode and daemon mode.
-//func TestGoer_StartModel(t *testing.T) {
-//	type args struct {
-//		daemon bool
-//	}
-//	tests := []struct {
-//		name string
-//		args args
-//	}{
-//		{name: "daemon-model", args: args{true}},
-//		{name: "debug-model", args: args{false}},
-//		//{name: "goer-tcp6", args: args{"127.0.0.1:8083", nil, "tcp6"}},
-//	}
-//
-//	for tt := range tests {
-//		t.Run(tt.name, func(t *testing.T) {
-//
-//		})
-//	}
-//	goer := NewGoer("127.0.0.1:9090", protocols.NewTextProtocol(), "tcp")
-//	goer.Daemon = true
-//}
+func TestGoer_RunAll(t *testing.T) {
+	conn, err := net.Dial("tcp", "127.0.0.1:8080")
+	if err != nil {
+		t.Errorf("could not connect goer: %v", err)
+	}
+	if conn == nil {
+
+	}
+	defer conn.Close()
+}
+
+func TestGoer_OnCallback(t *testing.T) {
+	tt := []struct {
+		name    string
+		message []byte
+		want    []byte
+	}{
+		{
+			"OnMessage callback one",
+			[]byte("OnConnect one\n"),
+			[]byte("Request received: OnConnect one\n"),
+		},
+		{
+			"OnMessage callback two",
+			[]byte("OnConnect\n"),
+			[]byte("Request received: OnConnect\n"),
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			conn, err := net.Dial("tcp", ":8080")
+			if err != nil {
+				t.Errorf("connect goer fail: %v", err)
+			}
+			defer conn.Close()
+
+			_, err = conn.Write(tc.message)
+			if err != nil {
+				t.Errorf("could not write message to goer: %v", err)
+			}
+
+			out := make([]byte, 1024)
+			if n, err := conn.Read(out); err == nil {
+				if bytes.Compare(out[:n], tc.want) != 0 {
+					t.Error("response did not match expected output")
+				}
+			} else {
+				t.Errorf("could not read message from connection.")
+			}
+		})
+	}
+}

@@ -9,7 +9,6 @@ import (
 	"goes/lib"
 	"goes/protocols"
 	"io"
-	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -59,8 +58,6 @@ type TCPConnection struct {
 	Protocol protocols.Protocol
 	// ID the id of connection.
 	ID int
-	// idRecorder id recorder.
-	idRecorder int
 	// MaxSendBufferSize set the maximum send buffer size for the current connection.
 	MaxSendBufferSize int
 	// MaxPackageSize set the maximum acceptable packet size for the current connection.
@@ -408,11 +405,6 @@ func (t *TCPConnection) destroy() {
 func NewTCPConnection(socket *net.Conn, remoteAddress string) *TCPConnection {
 	tcp := &TCPConnection{}
 	tcp.baseConnection.ConnectionCount++
-	tcp.ID++
-	tcp.idRecorder++
-	if tcp.idRecorder == math.MaxInt32 {
-		tcp.idRecorder = 0
-	}
 	tcp.socket = socket
 	tcp.MaxSendBufferSize = DefaultMaxSendBufferSize
 	tcp.MaxPackageSize = DefaultMaxPackageSize

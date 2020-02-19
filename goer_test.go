@@ -9,36 +9,79 @@ import (
 	"testing"
 )
 
-var goes *Goer
+var tcp, tcp4, udp *Goer
 
 func init() {
-	goes = NewGoer("127.0.0.1:8080", protocols.NewTextProtocol(), "tcp")
-	goes.OnConnect = func(connection connections.Connection) {
-		fmt.Println("new client is coming")
+	tcp = NewGoer("127.0.0.1:8080", protocols.NewTextProtocol(), "tcp")
+	tcp.OnConnect = func(connection connections.Connection) {
+		fmt.Println("tcp client is coming")
 	}
-	goes.OnMessage = func(connection connections.Connection, data []byte) {
+	tcp.OnMessage = func(connection connections.Connection, data []byte) {
 		connection.Send("Request received: "+string(data), false)
 	}
-	goes.OnClose = func() {
-		fmt.Println("client is closed.")
+	tcp.OnClose = func() {
+		fmt.Println("tcp client is closed.")
 	}
-	go func() {
-		goes.RunAll()
-	}()
+
+	tcp4 = NewGoer("127.0.0.1:8081", protocols.NewTextProtocol(), "tcp4")
+	tcp4.OnConnect = func(connection connections.Connection) {
+		fmt.Println("tcp4 client is coming")
+	}
+	tcp4.OnMessage = func(connection connections.Connection, data []byte) {
+		connection.Send("Request received: "+string(data), false)
+	}
+	tcp4.OnClose = func() {
+		fmt.Println("tcp4 client is closed.")
+	}
+
+	udp := NewGoer("127.0.0.1:9090", protocols.NewTextProtocol(), "udp")
+	udp.OnConnect = func(connection connections.Connection) {
+		fmt.Println("udp client is coming")
+	}
+	udp.OnMessage = func(connection connections.Connection, data []byte) {
+		connection.Send("Request received: "+string(data), false)
+	}
+	udp.OnClose = func() {
+		fmt.Println("udp client is closed.")
+	}
+
+	go tcp.RunAll()
+	go tcp4.RunAll()
+	go udp.RunAll()
 }
 
 func TestGoer_RunAll(t *testing.T) {
-	conn, err := net.Dial("tcp", "127.0.0.1:8080")
-	if err != nil {
-		t.Errorf("could not connect goer: %v", err)
+	servers := []struct {
+		protocol string
+		addr     string
+	}{
+		{"tcp", ":8080"},
+		{"tcp4", ":8081"},
+		{"udp", ":9090"},
 	}
-	if conn == nil {
 
+	for _, server := range servers {
+		conn, err := net.Dial(server.protocol, server.addr)
+		if err != nil {
+			t.Errorf("could not connect goer: %v", err)
+		}
+		if conn == nil {
+
+		}
+		defer conn.Close()
 	}
-	defer conn.Close()
+
 }
 
 func TestGoer_OnCallback(t *testing.T) {
+	servers := []struct {
+		protocol string
+		addr     string
+	}{
+		{"tcp", ":8080"},
+		{"udp", ":9090"},
+	}
+
 	tt := []struct {
 		name    string
 		message []byte
@@ -56,27 +99,35 @@ func TestGoer_OnCallback(t *testing.T) {
 		},
 	}
 
-	for _, tc := range tt {
-		t.Run(tc.name, func(t *testing.T) {
-			conn, err := net.Dial("tcp", ":8080")
-			if err != nil {
-				t.Errorf("connect goer fail: %v", err)
-			}
-			defer conn.Close()
-
-			_, err = conn.Write(tc.message)
-			if err != nil {
-				t.Errorf("could not write message to goer: %v", err)
-			}
-
-			out := make([]byte, 1024)
-			if n, err := conn.Read(out); err == nil {
-				if bytes.Compare(out[:n], tc.want) != 0 {
-					t.Error("response did not match expected output")
+	for _, server := range servers {
+		for _, tc := range tt {
+			t.Run(tc.name, func(t *testing.T) {
+				conn, err := net.Dial(server.protocol, server.addr)
+				if err != nil {
+					t.Errorf("connect goer fail: %v", err)
 				}
-			} else {
-				t.Errorf("could not read message from connection.")
-			}
-		})
+				defer conn.Close()
+
+				_, err = conn.Write(tc.message)
+				if err != nil {
+					t.Errorf("could not write message to goer: %v", err)
+				}
+
+				out := make([]byte, 1024)
+				if n, err := conn.Read(out); err == nil {
+					if bytes.Compare(out[:n], tc.want) != 0 {
+						t.Error("response did not match expected output")
+					}
+				} else {
+					t.Errorf("could not read message from connection.")
+				}
+			})
+		}
+	}
+}
+
+func BenchmarkGenerateConnectionID(t *testing.B) {
+	for i := 0; i < t.N; i++ {
+		tcp.generateConnectionID()
 	}
 }

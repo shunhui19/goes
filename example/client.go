@@ -3,14 +3,13 @@ package main
 import (
 	"goes/lib"
 	"io"
-	"log"
 	"net"
 )
 
 func main() {
 	conn, err := net.Dial("tcp", "127.0.0.1:8080")
 	if err != nil {
-		log.Fatal("connect server error: ", err)
+		lib.Fatal("connect server error: ", err)
 	}
 	defer conn.Close()
 

@@ -43,6 +43,7 @@ Goer 是一个通用的，灵活的Socket框架, 其设计思想主要是参考w
     }
     ```
 - 测试报告
+
     ```
     ab -n1000000 -c100 -k http://127.0.0.1:8080/
     This is ApacheBench, Version 2.3 <$Revision: 1706008 $>

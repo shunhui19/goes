@@ -49,14 +49,6 @@ var buildInTransports = []map[string]string{
 
 // Goer the main-goroutine server.
 type Goer struct {
-	// Name the name of main goroutine.
-	//Name string
-	// User unix user of process, needs appropriate privileges, usually root.
-	//User string
-	// Reloadable reloadable.
-	//Reloadable bool
-	// ReusePort reuse port.
-	//ReusePort bool
 	// Transport the protocol of transport layer, if transport layer protocol is empty,
 	// the default protocol is tcp.
 	Transport string
@@ -94,21 +86,17 @@ type Goer struct {
 	// OnMessage emitted when data is received.
 	OnMessage func(connection connections.Connection, data []byte)
 	// OnClose emitted when other end of the socket sends a FIN packet.
-	OnClose func()
+	OnClose func(connection connections.Connection)
 	// OnError emitted when an error occurs with connection.
 	OnError func(code int, msg string)
 	// OnBufferFull emitted when the send buffer becomes full.
-	OnBufferFull func()
+	OnBufferFull func(connection connections.Connection)
 	// OnBufferDrain emitted when the send buffer is empty.
-	OnBufferDrain func()
-	// OnGoerStop emitted when goer process stop.
-	OnGoerStop func()
-	// OnGoerReload emitted when goer process get reload signal.
-	OnGoerReload func()
-	// OnMainGoroutineReload emitted when the main goroutine process get reload signal.
-	//OnMainGoroutineReload func()
-	// OnMainGoroutineStop emitted when the main goroutine terminated.
-	//OnMainGoroutineStop func()
+	OnBufferDrain func(connection connections.Connection)
+	// OnStop emitted when goer process stop.
+	OnStop func()
+	// OnReload emitted when goer process get reload signal.
+	OnReload func()
 }
 
 // RunAll start server.
@@ -339,8 +327,8 @@ func (g *Goer) reload() {
 	lib.Info("Goer is reloading...")
 
 	// emitted when goer process get reload signal.
-	if g.OnGoerReload != nil {
-		g.OnGoerReload()
+	if g.OnReload != nil {
+		g.OnReload()
 	}
 
 	// get parent process of listener file descriptor.
@@ -404,9 +392,9 @@ func (g *Goer) stopAll(ch chan os.Signal, sig os.Signal) {
 
 // stop stop goer instance.
 func (g *Goer) stop() {
-	// emitted OnGoerStop callback func.
-	if g.OnGoerStop != nil {
-		g.OnGoerStop()
+	// emitted OnStop callback func.
+	if g.OnStop != nil {
+		g.OnStop()
 	}
 
 	// close client.

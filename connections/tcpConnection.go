@@ -47,11 +47,11 @@ type TCPConnection struct {
 	// OnError emitted when a error occurs with connection.
 	OnError func(code int, msg string)
 	// OnClose emitted when the other end of the socket send a FIN package.
-	OnClose func()
+	OnClose func(connection Connection)
 	// OnBufferFull emitted when the send buffer becomes full.
-	OnBufferFull func()
+	OnBufferFull func(connection Connection)
 	// OnBufferDrain emitted when the send buffer becomes empty.
-	OnBufferDrain func()
+	OnBufferDrain func(connection Connection)
 	// Transport transport.
 	Transport string
 	// Protocol application layer protocol.
@@ -189,7 +189,7 @@ func (t *TCPConnection) bufferIsFull() bool {
 func (t *TCPConnection) checkBufferWillFull() {
 	if len(t.sendBuffer) >= MaxSendBufferSize {
 		if t.OnBufferFull != nil {
-			t.OnBufferFull()
+			t.OnBufferFull(t)
 		}
 	}
 }
@@ -360,7 +360,7 @@ func (t *TCPConnection) write() {
 		t.byteWrite += n
 		t.sendBuffer = t.sendBuffer[:0]
 		if t.OnBufferDrain != nil {
-			t.OnBufferDrain()
+			t.OnBufferDrain(t)
 		}
 		if t.status == StatusClosing {
 			t.destroy()
@@ -392,7 +392,7 @@ func (t *TCPConnection) destroy() {
 
 	// trigger OnClose func.
 	if t.OnClose != nil {
-		t.OnClose()
+		t.OnClose(t)
 	}
 
 	if t.status == StatusClosed {

@@ -17,7 +17,9 @@ Goer 是一个通用的，灵活的Socket框架, 其设计思想主要是参考w
     采用经典的main-goroutine+child-goroutine来处理用户请求，后续会增加协程池来处理百万协程数量复用。
     
 #### 性能测试  
+
     **测试环境**
+
     ```
     CPU         Inter(R) Xeon(R) Platinum 8255C CPU @ 2.50GHz
     OS          Ubuntu Server 16.04.1 LTS 64位
@@ -42,6 +44,7 @@ Goer 是一个通用的，灵活的Socket框架, 其设计思想主要是参考w
     	goer.RunAll()
     }
     ```
+
     **测试报告**
     ```
     ab -n1000000 -c100 -k http://127.0.0.1:8080/

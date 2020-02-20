@@ -19,7 +19,7 @@ func init() {
 	tcp.OnMessage = func(connection connections.Connection, data []byte) {
 		connection.Send("Request received: "+string(data), false)
 	}
-	tcp.OnClose = func() {
+	tcp.OnClose = func(connection connections.Connection) {
 		fmt.Println("tcp client is closed.")
 	}
 
@@ -30,19 +30,13 @@ func init() {
 	tcp4.OnMessage = func(connection connections.Connection, data []byte) {
 		connection.Send("Request received: "+string(data), false)
 	}
-	tcp4.OnClose = func() {
+	tcp4.OnClose = func(connection connections.Connection) {
 		fmt.Println("tcp4 client is closed.")
 	}
 
 	udp := NewGoer("127.0.0.1:9090", protocols.NewTextProtocol(), "udp")
-	udp.OnConnect = func(connection connections.Connection) {
-		fmt.Println("udp client is coming")
-	}
 	udp.OnMessage = func(connection connections.Connection, data []byte) {
 		connection.Send("Request received: "+string(data), false)
-	}
-	udp.OnClose = func() {
-		fmt.Println("udp client is closed.")
 	}
 
 	go tcp.RunAll()
@@ -79,6 +73,7 @@ func TestGoer_OnCallback(t *testing.T) {
 		addr     string
 	}{
 		{"tcp", ":8080"},
+		{"tcp4", ":8081"},
 		{"udp", ":9090"},
 	}
 

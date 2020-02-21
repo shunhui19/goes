@@ -7,7 +7,6 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"goes/lib"
-	"goes/protocols"
 	"net/url"
 	"reflect"
 	"regexp"
@@ -94,10 +93,10 @@ func (h *Http) GetPost() url.Values {
 }
 
 // Input check the integrity of the package.
-func (h *Http) Input(recvBuffer []byte) interface{} {
+func (h *Http) Input(recvBuffer []byte, maxPackageSize int) interface{} {
 	position := bytes.IndexAny(recvBuffer, "\r\n\r\n")
 	if position == -1 {
-		if len(recvBuffer) >= protocols.MaxPackageSize {
+		if len(recvBuffer) >= maxPackageSize {
 			return false
 		}
 		return 0

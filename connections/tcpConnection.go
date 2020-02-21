@@ -293,7 +293,7 @@ func (t *TCPConnection) Read() {
 					}
 				} else {
 					// get length of package from protocol interface.
-					input := t.Protocol.Input(t.recvBuffer)
+					input := t.Protocol.Input(t.recvBuffer, t.MaxPackageSize)
 					switch input.(type) {
 					case int:
 						t.currentPackageLength = input.(int)

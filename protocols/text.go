@@ -10,8 +10,8 @@ type Text struct {
 }
 
 // Input check the integrity of the package.
-func (t *Text) Input(buffer []byte) interface{} {
-	if len(buffer) >= MaxPackageSize {
+func (t *Text) Input(buffer []byte, maxPackageSize int) interface{} {
+	if len(buffer) >= maxPackageSize {
 		return false
 	}
 

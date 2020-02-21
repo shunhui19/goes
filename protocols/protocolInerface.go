@@ -2,9 +2,6 @@
 // you can define custom protocol through implement three method.
 package protocols
 
-// MaxPackageSize the maximum size of package.
-const MaxPackageSize = 104856
-
 type Protocol interface {
 	// Encode encode package before send to client.
 	// The type of return is different for each protocol.
@@ -14,5 +11,5 @@ type Protocol interface {
 	// Input check the integrity of package.
 	// if return the value of bool, close connection, indicates that the package is greater than MaxPackageSize,
 	// else if return 0, the package is not a integrity package, continue to receive.
-	Input(recvBuffer []byte) interface{}
+	Input(recvBuffer []byte, maxPackageSize int) interface{}
 }

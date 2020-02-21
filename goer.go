@@ -497,7 +497,7 @@ func (g *Goer) acceptUDPConnection() {
 			if g.OnMessage != nil {
 				if g.Protocol != nil {
 					if n > 0 {
-						input := g.Protocol.Input(recvBuffer)
+						input := g.Protocol.Input(recvBuffer, connection.MaxPackageSize)
 						switch input.(type) {
 						case int:
 							if input.(int) == 0 {

@@ -1,6 +1,7 @@
 package goes
 
 import (
+	"errors"
 	"fmt"
 	"goes/connections"
 	"goes/lib"
@@ -35,17 +36,6 @@ const (
 	// StatusReloading the status of reloading.
 	StatusReloading = 8
 )
-
-// buildInTransports Go build-in transports protocols.
-var buildInTransports = []map[string]string{
-	{"tcp": "tcp"},
-	{"tcp4": "tcp4"},
-	{"tcp6": "tcp6"},
-	{"udp": "udp"},
-	{"unix": "unix"},
-	{"unixpacket": "unixpacket"},
-	{"ssl": "tcp"},
-}
 
 // Goer the main-goroutine server.
 type Goer struct {
@@ -108,8 +98,6 @@ func (g *Goer) RunAll() {
 	g.resetStd()
 	g.listen()
 	g.installSignal()
-	//g.displayUI()
-	//g.monitorWorkers()
 }
 
 // checkEnv check environment.
@@ -177,8 +165,11 @@ func (g *Goer) parseCommand() {
 		g.Daemon = true
 		g.isForked = true
 	case "start":
-		if _, err := os.Stat(g.PidFile); err == nil {
-			lib.Fatal("Already running or pid: %s file exist", g.PidFile)
+		// whether server is running?
+		if pid, err := g.getPid(); err == nil {
+			if err = syscall.Kill(pid, 0); err == nil {
+				lib.Fatal("Goes Already running")
+			}
 		}
 
 		if command2 == "-d" {
@@ -224,7 +215,6 @@ func (g *Goer) parseCommand() {
 		if err != nil {
 			lib.Fatal("Send SIGQUIT fail, error: %v", err)
 		}
-		//time.Sleep(1 * time.Second)
 
 		os.Exit(0)
 	default:
@@ -263,11 +253,6 @@ func (g *Goer) saveMainPid() {
 	file.Sync()
 }
 
-// displayUI display starting UI.
-func (g *Goer) displayUI() {
-
-}
-
 // resetStd redirect standard input and output.
 func (g *Goer) resetStd() {
 	if !g.Daemon {
@@ -280,11 +265,6 @@ func (g *Goer) resetStd() {
 	}
 	os.Stdout = handle
 	os.Stderr = handle
-}
-
-// monitorWorkers monitor all child goroutine.
-func (g *Goer) monitorWorkers() {
-
 }
 
 // installSignal install signal handler.
@@ -383,7 +363,7 @@ func (g *Goer) stopAll(ch chan os.Signal, sig os.Signal) {
 	// remove pid file.
 	err := os.Remove(g.PidFile)
 	if err != nil {
-		lib.Fatal("Remove pid file fail: %v", err)
+		lib.Warn("Remove pid file fail: %v", err)
 	}
 	lib.Info("Goer stop success")
 
@@ -584,16 +564,16 @@ func (g *Goer) getPid() (int, error) {
 	if _, err := os.Stat(g.PidFile); err == nil {
 		data, err := ioutil.ReadFile(g.PidFile)
 		if err != nil {
-			lib.Fatal("Goer not run.")
+			return 0, errors.New("Goes not run.")
 		}
 		processPid, err := strconv.Atoi(string(data))
 		if err != nil {
-			lib.Fatal("Unable to read and parse process pid found in: %v", g.PidFile)
+			return 0, errors.New("Unable to read and parse process pid.")
 		}
 		return processPid, nil
 	}
 
-	return 0, fmt.Errorf("goer not run")
+	return 0, errors.New("Goes not run.")
 }
 
 // gracefulWaitTimeout set graceful timeout.
@@ -608,7 +588,7 @@ func (g *Goer) gracefulWaitTimeout(duration time.Duration) error {
 
 	select {
 	case <-timeout.C:
-		return fmt.Errorf("time out")
+		return errors.New("time out")
 	case <-wait:
 		return nil
 	}

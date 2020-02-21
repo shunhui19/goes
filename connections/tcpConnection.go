@@ -36,6 +36,9 @@ const (
 	StatusClosing = 4
 	// StatusClosed closed status of connection.
 	StatusClosed = 8
+
+	// GoerSendFail send fail.
+	GoerSendFail = 2
 )
 
 // TCPConnection struct.
@@ -45,7 +48,7 @@ type TCPConnection struct {
 	// OnMessage emitted when data is received.
 	OnMessage func(connection Connection, data []byte)
 	// OnError emitted when a error occurs with connection.
-	OnError func(code int, msg string)
+	OnError func(connection Connection, code int, message string)
 	// OnClose emitted when the other end of the socket send a FIN package.
 	OnClose func(connection Connection)
 	// OnBufferFull emitted when the send buffer becomes full.
@@ -131,7 +134,7 @@ func (t *TCPConnection) Send(buffer string, raw bool) interface{} {
 			if t.socket == nil || err == io.EOF {
 				t.baseConnection.SendFail++
 				if t.OnError != nil {
-					t.OnError(2, "client is closed!")
+					t.OnError(t, GoerSendFail, "client is closed")
 				}
 				t.destroy()
 				return false
@@ -151,7 +154,7 @@ func (t *TCPConnection) Send(buffer string, raw bool) interface{} {
 			if t.socket == nil || err == io.EOF {
 				t.baseConnection.SendFail++
 				if t.OnError != nil {
-					t.OnError(2, "client is closed!")
+					t.OnError(t, GoerSendFail, "client is closed")
 				}
 				t.destroy()
 				return false
@@ -175,10 +178,9 @@ func (t *TCPConnection) Send(buffer string, raw bool) interface{} {
 
 // bufferIsFull whether send buffer is full.
 func (t *TCPConnection) bufferIsFull() bool {
-	if len(t.sendBuffer) >= MaxSendBufferSize {
+	if len(t.sendBuffer) >= t.MaxSendBufferSize {
 		if t.OnError != nil {
-			lib.Warn("code: %d, msg: %s", 2, "send buffer full and drop package")
-			t.OnError(2, "msg:send buffer full and drop package")
+			t.OnError(t, GoerSendFail, "send buffer full and drop package")
 		}
 		return true
 	}
@@ -187,7 +189,7 @@ func (t *TCPConnection) bufferIsFull() bool {
 
 // checkBufferWillFull check whether the send buffer will be full.
 func (t *TCPConnection) checkBufferWillFull() {
-	if len(t.sendBuffer) >= MaxSendBufferSize {
+	if len(t.sendBuffer) >= t.MaxSendBufferSize {
 		if t.OnBufferFull != nil {
 			t.OnBufferFull(t)
 		}
@@ -205,10 +207,6 @@ func (t *TCPConnection) Close(data string) {
 	}
 	t.status = StatusClosing
 	t.destroy()
-	//if len(t.sendBuffer) == 0 {
-	//} else {
-	//
-	//}
 }
 
 // GetRemoteIP get remote ip.
@@ -308,7 +306,7 @@ func (t *TCPConnection) Read() {
 					// the package length is unknown.
 					if t.currentPackageLength == 0 {
 						goto READ
-					} else if t.currentPackageLength > 0 && t.currentPackageLength < MaxPackageSize {
+					} else if t.currentPackageLength > 0 && t.currentPackageLength < t.MaxPackageSize {
 						// data is not enough for a package.
 						if t.currentPackageLength > t.byteRead {
 							goto READ

@@ -78,7 +78,7 @@ type Goer struct {
 	// OnClose emitted when other end of the socket sends a FIN packet.
 	OnClose func(connection connections.Connection)
 	// OnError emitted when an error occurs with connection.
-	OnError func(code int, msg string)
+	OnError func(connection connections.Connection, code int, message string)
 	// OnBufferFull emitted when the send buffer becomes full.
 	OnBufferFull func(connection connections.Connection)
 	// OnBufferDrain emitted when the send buffer is empty.
@@ -474,7 +474,6 @@ func (g *Goer) acceptTCPConnection() {
 
 		g.gracefulWait.Add(1)
 		go func() {
-			defer connection.Close("")
 			connection.Read()
 			// waiting for reload signal and one by one close old client.
 			g.gracefulWait.Done()

@@ -18,11 +18,11 @@ type UDPConnection struct {
 	socket net.PacketConn
 	// remoteAddress remote address.
 	remoteAddress net.Addr
-	// MaxPackageSize set the maximum packet size for receive and send.
-	MaxPackageSize int
 }
 
 // Send send data on the connection.
+// if return true indicate message send success, otherwise return false indicate send fail.
+// return nil indicate no data to send.
 func (u *UDPConnection) Send(buffer string, raw bool) interface{} {
 	if raw == false && u.Protocol != nil {
 		switch result := u.Protocol.Encode([]byte(buffer)).(type) {
@@ -49,7 +49,11 @@ func (u *UDPConnection) Close(data string) {
 	if len(data) != 0 {
 		u.Send(data, false)
 	}
-	return
+
+	err := u.socket.Close()
+	if err != nil {
+		lib.Warn(err.Error())
+	}
 }
 
 // GetRemoteIP get remote ip.
@@ -94,6 +98,5 @@ func NewUDPConnection(socket net.PacketConn, remoteAddr net.Addr) *UDPConnection
 	udp := &UDPConnection{}
 	udp.socket = socket
 	udp.remoteAddress = remoteAddr
-	udp.MaxPackageSize = DefaultMaxPackageSize
 	return udp
 }

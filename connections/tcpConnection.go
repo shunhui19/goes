@@ -130,7 +130,6 @@ func (t *TCPConnection) Send(buffer string, raw bool) interface{} {
 		n, err := (*t.socket).Write([]byte(buffer))
 		// connection maybe closed.
 		if err != nil {
-			lib.Warn("send data error: %v", err.Error())
 			if t.socket == nil || err == io.EOF {
 				t.baseConnection.SendFail++
 				if t.OnError != nil {
@@ -295,26 +294,21 @@ func (t *TCPConnection) Read() {
 					switch input.(type) {
 					case int:
 						t.currentPackageLength = input.(int)
+						// the package length is unknown.
+						if t.currentPackageLength == 0 {
+							goto READ
+						} else if t.currentPackageLength > 0 && t.currentPackageLength < t.MaxPackageSize {
+							// data is not enough for a package.
+							if t.currentPackageLength > t.byteRead {
+								goto READ
+							}
+						}
 					case bool:
 						if input == false {
-							t.Close("")
+							lib.Warn("error package. the package of current connection maxsize is: %d", t.MaxPackageSize)
+							t.destroy()
 							return
 						}
-					default:
-					}
-
-					// the package length is unknown.
-					if t.currentPackageLength == 0 {
-						goto READ
-					} else if t.currentPackageLength > 0 && t.currentPackageLength < t.MaxPackageSize {
-						// data is not enough for a package.
-						if t.currentPackageLength > t.byteRead {
-							goto READ
-						}
-					} else {
-						lib.Warn("error package. package_length=%d", t.currentPackageLength)
-						t.destroy()
-						return
 					}
 				}
 

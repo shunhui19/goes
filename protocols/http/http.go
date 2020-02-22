@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -64,15 +65,12 @@ var httpCode = map[int]string{
 	505: "Http Version Not Supported",
 }
 
-// Header Header key-value.
-type header map[string]interface{}
-
 // files the post file.
 type files map[int]map[string]interface{}
 
 // Http struct of http.
 type Http struct {
-	header               header
+	header               sync.Map
 	gzip                 bool
 	sessionPath          string
 	sessionName          string
@@ -117,26 +115,28 @@ func (h *Http) Input(recvBuffer []byte, maxPackageSize int) interface{} {
 func (h *Http) Encode(data []byte) interface{} {
 	// default http-code.
 	var header string
-	if _, ok := h.header["Http-Code"]; !ok {
+	if _, ok := h.header.Load("Http-Code"); !ok {
 		header = "HTTP/1.1 200 OK\r\n"
 	} else {
-		header = h.header["Http-Code"].(string) + "\r\n"
-		delete(h.header, "Http-Code")
+		v, _ := h.header.Load("Http-Code")
+		header = v.(string) + "\r\n"
+		h.header.Delete("Http-Code")
 	}
 
 	// content-type.
-	if _, ok := h.header["Content-Type"]; !ok {
+	if _, ok := h.header.Load("Content-Type"); !ok {
 		header += "Content-Type: text/html;charset=utf-8\r\n"
 	}
 
 	// other headers key-value.
-	for k, v := range h.header {
-		if k == "Set-Cookie" && reflect.TypeOf(v).Kind() == reflect.Map {
+	h.header.Range(func(key, value interface{}) bool {
+		if key == "Set-Cookie" && reflect.TypeOf(value).Kind() == reflect.Map {
 
 		} else {
-			header += v.(string) + "\r\n"
+			header += value.(string) + "\r\n"
 		}
-	}
+		return true
+	})
 	if h.gzip {
 		header += "Content-Encoding: gzip\r\n"
 		var buf bytes.Buffer
@@ -160,13 +160,13 @@ func (h *Http) Encode(data []byte) interface{} {
 
 // Decode parse POST, GET, COOKIE.
 func (h *Http) Decode(recvBuffer []byte) []byte {
-	h.header["Connection"] = "Connection: keep-alive"
+	h.header.Store("Connection", "Connection: keep-alive")
 	server := map[string]interface{}{
 		"QUERY_STRING":         "",
 		"REQUEST_METHOD":       "",
 		"REQUEST_URL":          "",
 		"SERVER_PROTOCOL":      "",
-		"SERVER_SOFTWARE":      "Goes",
+		"SERVER_SOFTWARE":      "Goes\\0.1",
 		"SERVER_NAME":          "",
 		"HTTP_HOST":            "",
 		"HTTP_USER_AGENT":      "",
@@ -347,6 +347,6 @@ func NewHttpProtocol() *Http {
 	return &Http{
 		files:  make(map[int]map[string]interface{}),
 		post:   &url.Values{},
-		header: map[string]interface{}{},
+		header: sync.Map{},
 	}
 }

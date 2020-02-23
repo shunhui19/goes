@@ -1,4 +1,4 @@
-Goer 是一个通用的，灵活的Socket框架, 其设计思想主要是参考workerman。
+Goer 是一个通用的，简洁，灵活的Socket框架, 其设计思想主要是参考workerman。
 
 #### 特性
 * 支持TCP, UDP  
@@ -22,7 +22,8 @@ Goer 是一个通用的，灵活的Socket框架, 其设计思想主要是参考w
     CPU         Inter(R) Xeon(R) Platinum 8255C CPU @ 2.50GHz
     OS          Ubuntu Server 16.04.1 LTS 64位
     Memery      8G
-    TestSoft    ab
+    TestSoft    ApacheBench/2.3
+    Go-version  go/1.12  
     ```
 - 测试脚本
     ```
@@ -90,3 +91,4 @@ Goer 是一个通用的，灵活的Socket框架, 其设计思想主要是参考w
       99%      2
      100%     12 (longest request)
     ```
+

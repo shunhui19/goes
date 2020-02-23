@@ -261,11 +261,11 @@ func (t *TCPConnection) Read() {
 
 	}
 
+	bytesPool := lib.NewBytesPool(1024)
 	for {
 	READ:
-		// this need to optimize.
-		buf := make([]byte, 1024)
-		n, err := (*t.socket).Read(buf)
+		buf := bytesPool.Get()
+		n, err := (*t.socket).Read(buf.B)
 		if err != nil || err == io.EOF {
 			t.Close("server close client")
 			return
@@ -278,7 +278,8 @@ func (t *TCPConnection) Read() {
 		}
 
 		t.byteRead += n
-		t.recvBuffer = append(t.recvBuffer, buf[:n]...)
+		t.recvBuffer = append(t.recvBuffer, buf.B[:n]...)
+		bytesPool.Put(buf)
 		// if the application layer protocol has been set up.
 		if t.Protocol != nil {
 			for len(t.recvBuffer) > 0 {

@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"goes"
-	"goes/connections"
-	"goes/lib"
-	"goes/protocols"
+
+	"github.com/shunhui19/goes"
+	"github.com/shunhui19/goes/connections"
+	"github.com/shunhui19/goes/lib"
+	"github.com/shunhui19/goes/protocols"
 )
 
 func main() {

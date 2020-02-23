@@ -1,9 +1,10 @@
 package main
 
 import (
-	"goes/lib"
 	"io"
 	"net"
+
+	"github.com/shunhui19/goes/lib"
 )
 
 func main() {

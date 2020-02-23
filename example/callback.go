@@ -1,9 +1,9 @@
 package main
 
 import (
-	"goes"
-	"goes/connections"
-	"goes/lib"
+	"github.com/shunhui19/goes"
+	"github.com/shunhui19/goes/connections"
+	"github.com/shunhui19/goes/lib"
 )
 
 func main() {

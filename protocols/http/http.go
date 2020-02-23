@@ -6,13 +6,14 @@ import (
 	"bytes"
 	"compress/gzip"
 	"encoding/json"
-	"goes/lib"
 	"net/url"
 	"reflect"
 	"regexp"
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/shunhui19/goes/lib"
 )
 
 // methods the method of http request.

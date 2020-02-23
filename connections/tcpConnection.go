@@ -6,12 +6,13 @@
 package connections
 
 import (
-	"goes/lib"
-	"goes/protocols"
 	"io"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/shunhui19/goes/lib"
+	"github.com/shunhui19/goes/protocols"
 )
 
 const (

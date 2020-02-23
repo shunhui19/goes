@@ -2,8 +2,9 @@ package main
 
 import (
 	"fmt"
-	"goes/lib"
 	"time"
+
+	"github.com/shunhui19/goes/lib"
 )
 
 func main() {

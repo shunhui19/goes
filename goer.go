@@ -3,9 +3,6 @@ package goes
 import (
 	"errors"
 	"fmt"
-	"goes/connections"
-	"goes/lib"
-	"goes/protocols"
 	"io/ioutil"
 	"math"
 	"net"
@@ -19,6 +16,10 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/shunhui19/goes/connections"
+	"github.com/shunhui19/goes/lib"
+	"github.com/shunhui19/goes/protocols"
 )
 
 const (

@@ -2,11 +2,12 @@
 package connections
 
 import (
-	"goes/lib"
-	"goes/protocols"
 	"net"
 	"strconv"
 	"strings"
+
+	"github.com/shunhui19/goes/lib"
+	"github.com/shunhui19/goes/protocols"
 )
 
 // UDPConnection struct.

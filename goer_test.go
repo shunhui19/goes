@@ -3,10 +3,11 @@ package goes
 import (
 	"bytes"
 	"fmt"
-	"goes/connections"
-	"goes/protocols"
 	"net"
 	"testing"
+
+	"github.com/shunhui19/goes/connections"
+	"github.com/shunhui19/goes/protocols"
 )
 
 var tcp, tcp4, udp *Goer

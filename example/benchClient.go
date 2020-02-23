@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"goes/lib"
 	"io"
 	"net"
 	"sync"
+
+	"github.com/shunhui19/goes/lib"
 )
 
 func main() {

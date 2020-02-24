@@ -15,7 +15,12 @@ func (t *Frame) Input(buffer []byte, maxPackageSize int) interface{} {
 		return 0
 	}
 
-	return int(binary.BigEndian.Uint32(buffer[:4]))
+	len := int(binary.BigEndian.Uint32(buffer[:4]))
+	if len > maxPackageSize {
+		return false
+	} else {
+		return len
+	}
 }
 
 // Decode decode the buffer.

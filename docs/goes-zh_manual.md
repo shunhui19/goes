@@ -1,3 +1,7 @@
+---
+
+---
+
 #Goes
 goes是一个通用的，简洁，灵活的Socket框架。
 
@@ -25,6 +29,11 @@ goes是一个通用的，简洁，灵活的Socket框架。
         - Del
         - Range
         - Len
+* [Protocol接口](#protocol接口)
+    - 方法
+        - Input
+        - Decode
+        - Encode
 * [Goer](#goer)
     - 属性
         - Transport
@@ -52,22 +61,29 @@ goes是一个通用的，简洁，灵活的Socket框架。
         - Protocol
         - MaxSendBufferSize
         - MaxPackageSize
-        - Connections
     - 回调属性
         - OnMessage
         - OnClose
         - OnError
         - OnBufferFull
         - OnBufferDrain
-        - Send
     - 方法
+        - Send
         - Close
-        - GetRemoteAddress]
+        - GetRemoteAddress
         - GetRemoteIP
         - GetRemotePort
         - GetLocalAddress
         - GetLocalIP
         - GetLocalPort
+
+* [timer定时器](#timer定时器)
+    - 方法
+        - NewTimer
+        - Add
+        - Del
+        - Start
+        - Stop
 ***
 
 ## 简介
@@ -204,27 +220,43 @@ go get github.com/shunhui19/goes
 - 平滑重启, 当发布新版本或更新业务时, 可使服务不中断完成升级, 提升用户体验
    ```
     go server.go reload
-    ```
+   ```
 
 ## 协议
 传输层有两种协议，TCP协议和UDP协议,
 TCP协议相对于UDP协议，主要特点是：**面向连接的，字节流和可靠传输**, 所谓面向连接,就是通信双方必须先三次握手建立连接才能通信,
 字节流就是数据像水一样从一端(比如服务端或客户端)流向另一端, 所以为了区分每次发送的数据，就必须定一个规则从数据流中取出每次发送的数据，
-这个规则就是**应用层自定义协议**
+这个规则就是**应用层自定义协议**,在实际编程中就两点：
+- 设置数据的边界
+- 数据格式定义
 
- goes中定义了自定义协议**Protocol接口**,该接口封装三个方法，只要实现这三个方法即可完成新的协议制定，详情查看对应文档
+以内置的text文本协议为例,以一个换行符作为包的边界：
+- 边界设置："\n"就是一个边界标识
+- 数据格式定义: data+"\n",这就是一个完整的包
+
+以内置的http协议为例, http协议为协议头header + \r\n\r\n + 协议体body, body可以为空:
+- 边界设置; 根据http协议的定义，一个完整的http请求，至少要包括header + \r\n\r\n , 所以边界标识就是 \r\n\r\n
+- 数据格式定义: header + \r\n\r\n + body
+
+goes中定义了自定义协议**Protocol接口**,该接口封装三个方法，只要实现这三个方法即可完成新的协议制定,这三个方法为：
+```
+Input(data []byte, maxPackageSize int) interface{} // 判断当前数据中data是否包含一个边界标识符
+Decode(data[]byte) interface{} // 解析数据data格式，并发送给OnMessage回调函数
+Encode(data[]byte) []byte // 打包数据data为指定格式，并发给客户端
+```
 
 ## connection接口
 该接口针对传输层协议的连接接口，该接口包含的方法用于对连接相关操作
 * #### Send(data string, raw bool) interface{}
         说明:用当前连接发送数据
         参数:
-        [data string] 待发送的数据。
-        [raw bool]    是否发送原始数据，即不经过应用层协议编码，直接发送数据。
-        返回值:
+        [data string]       待发送的数据。
+        [raw bool]          是否发送原始数据，即不经过应用层协议编码，直接发送数据。
+         返回值:
         interface{}     消息发送状态
         当返回nil时表示数据已经发送到应用层发送缓冲区，等待发送到系统内核发送缓冲区;
         当返回false时，发送失败，返回true表示已经发送到系统内核发送缓冲区。
+
     实例:
     ```
     package main
@@ -256,26 +288,26 @@ TCP协议相对于UDP协议，主要特点是：**面向连接的，字节流和
         [data string]   关闭时待发送的数据, 可用于通知客户端，服务端准备关闭连接。
         返回值:
         无
+
     实例:
     ```
     package main
-
     import (
-        "github.com/shunhui19/goes"
-        "github.com/shunhui19/goes/connections"
-    )
+            "github.com/shunhui19/goes"
+            "github.com/shunhui19/goes/connections"
+        )
 
     func main() {
-        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+            goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
 
-        goer.OnMessage = func(connection connections.Connection, data []byte) {
+    goer.OnMessage = func(connection connections.Connection, data []byte) {
             // 收到客户端消息后，关闭客户端连接
             connection.Close("server is reload...")
             // 直接关闭，不发送数据
             // connection.Close("")
         }
 
-        goer.RunAll()
+    goer.RunAll()
     }
     ```
 * #### GetRemoteAddress() string
@@ -360,7 +392,7 @@ TCP协议相对于UDP协议，主要特点是：**面向连接的，字节流和
         goer.OnConnect = func(connection connections.Connection) {
             // 遍历所有连接
             goer.Connections.Range(func(key, value interface{}) bool {
-                if otherConnection := value.(*connections.TCPConnection); otherConnection.GetRemoteAddress() != connection.GetRemoteAddress() {
+                if otherConnection := value.(connections.Connection); otherConnection.GetRemoteAddress() != connection.GetRemoteAddress() {
                     otherConnection.Send(fmt.Sprintf("a new client[%v] is online", connection.GetRemoteAddress()), false)
                 }
                 return true
@@ -371,11 +403,35 @@ TCP协议相对于UDP协议，主要特点是：**面向连接的，字节流和
     }
     ```
 * #### Len()
-        说明:获取连接总数,业务中基础用不到这个方法
+        说明:获取连接总数,业务中基本用不到这个方法
         参数:
         无
         返回值:
         int     连接总数
+
+## protocol接口
+该接口定义了自定义协议的规则，只需实现三个方法即可完成新协议制定，在启动服务时配置协议字段 Goer.Protocol
+* #### Input(data []byte) interface{}
+        说明:判断接收的数据是否为一个完整的包
+        参数:
+        data    []byte  客户端发送的数据
+        返回值:
+        interface{}		有两种具体类型，bool类型和int类型，分别代表不同含意
+        如果包大小超过了最大包长度限制，返回false
+        如果不是一个完整的包，则继续接收数据，返回0
+        如果收到一个完整的包数据，返回包的长度
+* #### Decode(data []byte) []byte
+        说明:从data数据中解析一个包
+        参数:
+        data    []byte  客户端发送的数据
+        返回值:
+        []byte  解包后的数据
+* #### Encode(data []byte) interface{}
+        说明:数据发送给客户端之前，按协议规则打包指定格式
+        参数:
+        data    []byte  发送客户端的数据
+        返回值:
+        interface{}  打包之后的数据,有多种具体类型，目前只支持 []byte类型和string类型
 
 ## goer
 Goer结构体是goes的核心对象，它接收连接，处理连接上的数据,并通过一系列回调函数实现业务处理
@@ -387,8 +443,7 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
   ```
 目前只支持tcp, tcp4, udp, udp4, 如果为空, 则使用默认值为"tcp"
 
-    实例:
-    使用TCP协议
+  实例(使用TCP协议):
     ```
     package main
 
@@ -415,8 +470,8 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
   ```
 可以为nil，表示不使用应用层协议，使用传输层协议
 
-    实例:
-    使用text文本协议
+  实例(使用text文本协议):
+
     ```
     package main
 
@@ -444,7 +499,7 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
   ```
 默认为 false, 当以daemon模式运行时，停止服务执行 go ./executeFile(可执行文件) stop 命令
 
-    实例:
+  实例:
     ```
     package main
 
@@ -471,7 +526,7 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
   ```
 当以Daemon模式运行，不设置StdoutFile属性，则输出到 /dev/null
 
-    实例:
+  实例:
     ```
     package main
 
@@ -500,7 +555,7 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
   ```
 默认存储在 goes 项目根目录内
 
-    实例:
+  实例:
     ```
     package main
 
@@ -528,7 +583,7 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
   ```
 该接口目前只有一个结构体 ConnStore 实现
 
-    实例
+  实例
     ```
     package main
 
@@ -542,20 +597,510 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
     func main() {
         goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
 
-        // 当有新的客户端连接过来时，通知其它在线客户端有新的连接上线了
+        	// 当有新的客户端连接过来时，通知其它在线客户端有新的连接上线了
+  	goer.OnConnect = func(connection connections.Connection) {
+  		goer.Connections.Range(func(key, value interface{}) bool {
+  			if otherConnection := value.(connections.Connection); otherConnection.GetRemoteAddress() != connection.GetRemoteAddress() {
+  				otherConnection.Send(fmt.Sprintf("a new client[%v] is online", connection.GetRemoteAddress()), false)
+  			}
+  			return true
+  		})
+  	}
+
+        goer.RunAll()
+    }
+    ```
+
+### 回调方法
+- #### OnConnect(conneciton connections.Connection)
+        说明:连接客户端与服务端完成TCP三次握手之后触发回调方法, udp协议无此回调方法
+        参数:
+        conneciton  connections.Connection 连接接口, TCPConnection实现了这个接口
+        返回值:
+        无
+
+    实例:
+    ```
+    package main
+
+    import (
+        "fmt"
+
+        "github.com/shunhui19/goes"
+        "github.com/shunhui19/goes/connections"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+
+        // OnConnect 回调方法
         goer.OnConnect = func(connection connections.Connection) {
-            goer.Connections.Range(func(key, value interface{}) bool {
-                if otherConnection := value.(*connections.TCPConnection); otherConnection.GetRemoteAddress() != connection.GetRemoteAddress() {
-                    otherConnection.Send(fmt.Sprintf("a new client[%v] is online", connection.GetRemoteAddress()), false)
-                }
-                return true
-            })
+            fmt.Println("a new client is coming, the client address: %v", connection.GetRemoteAddress())
+        }
+
+        goer.RunAll()
+    }
+    ```
+- #### OnMessage(conneciton connections.Connection, data []byte)
+        说明: 当服务端收到客户端消息时触发回调方法
+        参数:
+        conneciton  connections.Connection 连接接口
+        data        []byte  客户端发送的消息，如果指定应用层协议，则data是解码后的数据
+        返回值:
+        无
+
+    实例:
+    ```
+    package main
+
+    import (
+        "github.com/shunhui19/goes/lib"
+
+        "github.com/shunhui19/goes"
+        "github.com/shunhui19/goes/connections"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+
+        // OnMessage 回调方法
+        goer.OnMessage = func(connection connections.Connection, data []byte) {
+            lib.Info("receive client data: %v", string(data))
+        }
+
+        goer.RunAll()
+    }
+    ```
+- #### OnClose(conneciton connections.Connection)
+        说明:收到客户端发送的FIN包时触发
+        参数:
+        conneciton  connections.Connection 连接接口
+        返回值:
+        无
+
+    实例:
+    ```
+    package main
+
+    import (
+        "github.com/shunhui19/goes"
+        "github.com/shunhui19/goes/connections"
+        "github.com/shunhui19/goes/lib"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+
+        // OnClose 回调方法
+        goer.OnClose = func(connection connections.Connection) {
+            lib.Info("client is closing")
+        }
+
+        goer.RunAll()
+    }
+    ```
+- #### OnError(conneciton connections.Connection, code int, message string)
+        说明:与客户端的连接发生错误时触发,目前主要两个地方会触发
+        1.执行connection.Send()方法时，与客户端连接已经断开
+        2.发送缓冲区sendBuffer已经满了
+        参数:
+        conneciton  connections.Connection 连接接口
+        code        int     错误码
+        message     string  错误信息
+        返回值:
+        无
+
+    实例:
+    ```
+    package main
+
+    import (
+        "fmt"
+
+        "github.com/shunhui19/goes"
+        "github.com/shunhui19/goes/connections"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+
+        // OnMessage 回调函数
+        goer.OnError = func(connection connections.Connection, code int, message string) {
+            fmt.Printf("error %d, reason %s", code, message)
+        }
+
+        goer.RunAll()
+    }
+    ```
+- #### OnBufferFull(conneciton connections.Connection)
+        说明:当发送缓冲区满时触发
+        参数:
+        conneciton  connections.Connection 连接接口
+        返回值:
+        无
+
+    实例:
+    ```
+    package main
+
+    import (
+        "fmt"
+
+        "github.com/shunhui19/goes"
+        "github.com/shunhui19/goes/connections"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+
+        // OnBufferFull 回调函数
+        goer.OnBufferFull = func(connection connections.Connection) {
+            fmt.Println("the send buff is full")
+        }
+
+        goer.RunAll()
+    }
+    ```
+- #### OnBufferDrain(conneciton connections.Connection)
+        说明:当发送缓冲区为空时触发
+        参数:
+        conneciton  connections.Connection 连接接口
+        返回值:
+        无
+
+    实例:
+    ```
+    package main
+
+    import (
+        "fmt"
+
+        "github.com/shunhui19/goes"
+        "github.com/shunhui19/goes/connections"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+
+        // OnBufferDrain 回调函数
+        goer.OnBufferDrain = func(connection connections.Connection) {
+            fmt.Println("the send buff is empty")
+        }
+
+        goer.RunAll()
+    }
+    ```
+- #### OnStop()
+        说明:当goes服务停止时触发
+        参数:
+        无
+        返回值:
+        无
+
+    实例:
+    ```
+    package main
+
+    import (
+        "fmt"
+
+        "github.com/shunhui19/goes"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+
+        // OnStop 回调函数
+        goer.OnStop = func() {
+            fmt.Println("the server is stop")
+        }
+
+        goer.RunAll()
+    }
+    ```
+- #### OnReload()
+        说明:当goes执行reload平滑重启命令时触发
+        参数:
+        无
+        返回值:
+        无
+
+    实例:
+    ```
+    package main
+
+    import (
+        "fmt"
+
+        "github.com/shunhui19/goes"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+        goer.StdoutFile = "./reload.log"
+
+        // OnReload 回调函数
+        goer.OnReload = func() {
+            fmt.Println("the server is reload")
         }
 
         goer.RunAll()
     }
     ```
 
+### 方法
+- #### NewGoer(socketName string, applicationProtocol protocol.Protocol, transportProtocol string) *Goer
+        说明:获取Goer实例
+        参数:
+        socketName  string  监听地址，形式为ip+port, eg: 127.0.0.1:8080
+        applicationProtocol protocotl.Protocol  协议接口,自定义应用层协议都需要实现此接口,如果为nil表示直接使用传输层协议，不使用应用层协议
+        transportProtocol   string  传输层协议字符串,为空则使用默认"tcp"协议
+        返回值:
+        *Goer
+
+    实例:
+    ```
+    package main
+
+    import (
+        "github.com/shunhui19/goes"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+
+        goer.RunAll()
+    }
+    ```
+- ### RunAll()
+        说明:启动Goes服务
+        参数:
+        无
+        返回值:
+        无
+
 ## tcpconnection
 TCPConnection结构体是goes的核心对象，每个TCPConnection实例表示一个TCP连接
+
 ### 属性
+- #### ID
+  说明:
+  ```
+  int   当前连接对象唯一ID
+  ```
+
+    实例:
+    ```
+    package main
+
+    import (
+        "fmt"
+
+        "github.com/shunhui19/goes"
+        "github.com/shunhui19/goes/connections"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+
+        goer.OnConnect = func(connection connections.Connection) {
+            fmt.Println("the client ID: ", connection.(*connections.TCPConnection).ID)
+        }
+
+        goer.RunAll()
+    }
+    ```
+- #### Protocol
+  说明:
+  ```
+  protocols.Protocol    接口类型    当前连接的协议实例，只要实现了protocols.Protocol接口,一般直接在启动服务的时候启动,这针对当前连接有效
+  ```
+
+    实例:
+    ```
+    package main
+
+    import (
+        "github.com/shunhui19/goes/protocols"
+
+        "github.com/shunhui19/goes"
+        "github.com/shunhui19/goes/connections"
+    )
+
+    func main() {
+        goer := goes.NewGoer("127.0.0.1:8080", nil, "tcp")
+
+        // 有连接过来时，设置应用层协议为text文本协议,只针对当前连接效
+        goer.OnConnect = func(connection connections.Connection) {
+            connection.(*connections.TCPConnection).Protocol = protocols.NewTextProtocol()
+        }
+
+        goer.RunAll()
+    }
+    ```
+- #### MaxSendBufferSize
+  说明:
+  ```
+  int   当前连接发送缓冲区最大长度, 不设置默认值为 1M，此属性会影响到OnBufferFull回调
+  ```
+- #### MaxPackageSize
+  说明:
+  ```
+  int   当前连接收发包最大长度, 不设置默认值为 10M
+  ```
+
+### 回调函数
+回调函数和Goer结构体中的回调函数类似，只是Goer中的回调函数是全局的，即对所有连接生效，而TCPConnection中的回调函数只针对当前连接有效
+### 方法
+方法connections.Connection接口中的方法, 具体查看[Connection接口](#connection接口)文档
+
+## timer定时器
+定时器是基于时间轮算法实现的，原理 [查看](https://www.ibm.com/developerworks/cn/linux/l-cn-timers/)
+
+### 方法
+- #### NewTimer(slotNumber int, si time.Duration)
+    ```
+    说明:获取一个定时器实例
+    参数：
+    slotNumber  int             转动一圈的格子数
+    si          time.Duration   在时间轮转动一格的时间, 理解为转一格的速度
+    ```
+    实例一(秒级定时):
+    ```
+    package main
+
+    import (
+        "fmt"
+        "time"
+
+        "github.com/shunhui19/goes/lib"
+    )
+
+    func main() {
+        fmt.Printf("[%v]start...\n", time.Now())
+        // 定义一圈格式数为 60, 每1秒转动一格
+        timer := lib.NewTimer(60, 1*time.Second)
+
+        // 添加一个定时任务， 5秒后执行, 只执行一次
+        timer.Add(5*time.Second, func(v ...interface{}) {
+            // 这里回调函数里写业务逻辑, 参数 v 是传递的 args 变量
+            fmt.Printf("[%v]: %v\n", time.Now(), v)
+        }, "hello, goes", false)
+
+        // 开始执行
+        timer.Start()
+
+        select {}
+    }
+    ```
+    实例二(毫秒级定时):
+    ```
+    package main
+
+    import (
+        "fmt"
+        "time"
+
+        "github.com/shunhui19/goes/lib"
+    )
+
+    func main() {
+        // 毫秒定时器, 3600个格式，每100毫秒转动一格
+        timerMillisecond := lib.NewTimer(3600, 100*time.Millisecond)
+
+        // 添加一个定时任务, 每200毫秒执行一次, 并一直运行
+        timerMillisecond.Add(200*time.Millisecond, func(v ...interface{}) {
+            fmt.Printf("[%v]: %v\n", time.Now(), v)
+        }, "milliSecond timer", true)
+
+        timerMillisecond.Start()
+
+        select {}
+    }
+    ```
+
+- #### Add(timeInterval time.Duration, fn func(v ...interface{}), args interface{}, persitent bool) TaskID
+    ```
+    说明:增加一个定时任务
+    参数：
+    timerInterval   time.Duration           多久之后开始执行
+    fn              func(v ...interface)    执行的回调函数
+    args            interface{}             回调函数中的参数
+    persistent      bool                    是否持久执行
+    返回值:
+    TaskID          TaskID                  当前添加定时任务的唯一ID标识，用于删除操作
+    ```
+    实例:
+    ```
+    package main
+
+    import (
+        "fmt"
+        "time"
+
+        "github.com/shunhui19/goes/lib"
+    )
+
+    func main() {
+        timeFormat := "2006-01-02 15:04:05.9999"
+
+        // 秒级定时
+        t := lib.NewTimer(10, 1*time.Second)
+        // 毫秒级定时
+        //t := lib.NewTimer(10, 100*time.Millisecond)
+
+        // 5秒后执行一次定时任务
+        t.Add(5*time.Second, func(v ...interface{}) {
+            // 这里是具体回调函数要执行的内容
+            fmt.Printf("[%v]: %v\n", time.Now().Format(timeFormat), v)
+        }, "after 5 second to run", false)
+
+        // 2秒后执行，一直循环定时任务
+        timerID := t.Add(2*time.Second, func(v ...interface{}) {
+            fmt.Printf("[%v]: %v\n", time.Now().Format(timeFormat), v)
+        }, "2秒循环定时任务", true)
+
+        // 10秒钟后删除循环定时任务
+        t.Add(10*time.Second, func(v ...interface{}) {
+            fmt.Printf("[%v]: 开始执行删除操作\n", time.Now().Format(timeFormat))
+            if ok := t.Del(timerID); ok {
+                fmt.Println("删除成功")
+            } else {
+                fmt.Println("删除失败")
+            }
+        }, timerID, false)
+
+        // 启动运行
+        fmt.Printf("[%v]: start...\n", time.Now().Format(timeFormat))
+        t.Start()
+
+        select {}
+    }
+    ```
+
+- #### Del(taskID TaskID)
+    ```
+    说明:删除一个定时任务
+    参数：
+    TaskID          TaskID                  添加定时任务返回的唯一ID标识
+    返回值:
+    无
+    ```
+
+- #### Start()
+    ```
+    说明:启动定时服务
+    参数：
+    无
+    返回值:
+    无
+    ```
+
+- #### Stop()
+    ```
+    说明:停止定时服务
+    参数：
+    无
+    返回值:
+    无
+    ```

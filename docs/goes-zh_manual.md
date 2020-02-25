@@ -1,8 +1,4 @@
----
-
----
-
-#Goes
+# Goes
 goes是一个通用的，简洁，灵活的Socket框架。
 
 * [简介](#简介)
@@ -436,12 +432,13 @@ Encode(data[]byte) []byte // 打包数据data为指定格式，并发给客户�
 ## goer
 Goer结构体是goes的核心对象，它接收连接，处理连接上的数据,并通过一系列回调函数实现业务处理
 ### 属性
+
 - #### Transport
   说明:
   ```
   string    传输层协议, 包括tcp4, tcp, tcp6, unix unixpacket, ssl, udp4, udp, udp6, unixgram
   ```
-目前只支持tcp, tcp4, udp, udp4, 如果为空, 则使用默认值为"tcp"
+  目前只支持tcp, tcp4, udp, udp4, 如果为空, 则使用默认值为"tcp"
 
   实例(使用TCP协议):
     ```
@@ -463,15 +460,15 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
         goer.RunAll()
     }
     ```
+
 - #### Protocol
   说明:
   ```
   string    应用层自定义协议
   ```
-可以为nil，表示不使用应用层协议，使用传输层协议
+  可以为nil，表示不使用应用层协议，使用传输层协议
 
   实例(使用text文本协议):
-
     ```
     package main
 
@@ -497,7 +494,7 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
   ```
   bool  服务启动是否以守护进程运行, 此属性与启动时命令行执行 -d 参数效果相同
   ```
-默认为 false, 当以daemon模式运行时，停止服务执行 go ./executeFile(可执行文件) stop 命令
+  默认为 false, 当以daemon模式运行时，停止服务执行 go ./executeFile(可执行文件) stop 命令
 
   实例:
     ```
@@ -524,7 +521,7 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
   ```
   string  输出重定向文件, 所有输出和错误信息都将写入此文件，此属性只支持在Daemon模式下运行
   ```
-当以Daemon模式运行，不设置StdoutFile属性，则输出到 /dev/null
+  当以Daemon模式运行，不设置StdoutFile属性，则输出到 /dev/null
 
   实例:
     ```
@@ -553,7 +550,7 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
   ```
   string    服务进程Pid值存储文件, 该文件用于在执行平滑重启命令 go ./exectFile reload
   ```
-默认存储在 goes 项目根目录内
+  默认存储在 goes 项目根目录内
 
   实例:
     ```
@@ -581,7 +578,7 @@ Goer结构体是goes的核心对象，它接收连接，处理连接上的数据
   ```
   connections.CStore    接口类型,该接口定义了存储连接的增删改查方法，主要用于给所有连接客户端发送消息等等
   ```
-该接口目前只有一个结构体 ConnStore 实现
+  该接口目前只有一个结构体 ConnStore 实现
 
   实例
     ```

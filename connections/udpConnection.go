@@ -4,7 +4,6 @@ package connections
 import (
 	"net"
 	"strconv"
-	"strings"
 
 	"github.com/shunhui19/goes/lib"
 	"github.com/shunhui19/goes/protocols"
@@ -59,13 +58,15 @@ func (u *UDPConnection) Close(data string) {
 
 // GetRemoteIP get remote ip.
 func (u *UDPConnection) GetRemoteIP() string {
-	return strings.Split(u.remoteAddress.String(), ":")[0]
+	IP, _, _ := net.SplitHostPort(u.remoteAddress.String())
+	return IP
 }
 
 // GetRemotePort get remote port.
 func (u *UDPConnection) GetRemotePort() int {
-	port, _ := strconv.Atoi(strings.Split(u.remoteAddress.String(), ":")[1])
-	return port
+	_, port, _ := net.SplitHostPort(u.remoteAddress.String())
+	p, _ := strconv.Atoi(port)
+	return p
 }
 
 // GetRemoteAddress get remote address, the format is like this 127.0.0.1:8080.
@@ -75,13 +76,15 @@ func (u *UDPConnection) GetRemoteAddress() string {
 
 // GetLocalIP get local ip.
 func (u *UDPConnection) GetLocalIP() string {
-	return strings.Split((u.socket).LocalAddr().String(), ":")[0]
+	IP, _, _ := net.SplitHostPort((u.socket).LocalAddr().String())
+	return IP
 }
 
 // GetLocalPort get local port.
 func (u *UDPConnection) GetLocalPort() int {
-	port, _ := strconv.Atoi(strings.Split((u.socket).LocalAddr().String(), ":")[1])
-	return port
+	_, port, _ := net.SplitHostPort((u.socket).LocalAddr().String())
+	p, _ := strconv.Atoi(port)
+	return p
 }
 
 // GetLocalAddress get remote address, the format is like this http://127.0.0.1:8080.

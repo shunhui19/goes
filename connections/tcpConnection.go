@@ -9,7 +9,6 @@ import (
 	"io"
 	"net"
 	"strconv"
-	"strings"
 
 	"github.com/shunhui19/goes/lib"
 	"github.com/shunhui19/goes/protocols"
@@ -211,16 +210,15 @@ func (t *TCPConnection) Close(data string) {
 
 // GetRemoteIP get remote ip.
 func (t *TCPConnection) GetRemoteIP() string {
-	return strings.Split(t.remoteAddress, ":")[0]
+	IP, _, _ := net.SplitHostPort(t.remoteAddress)
+	return IP
 }
 
 // GetRemotePort get remote port.
 func (t *TCPConnection) GetRemotePort() int {
-	if t.remoteAddress != "" {
-		port, _ := strconv.Atoi(strings.Split(t.remoteAddress, ":")[1])
-		return port
-	}
-	return 0
+	_, port, _ := net.SplitHostPort(t.remoteAddress)
+	p, _ := strconv.Atoi(port)
+	return p
 }
 
 // GetRemoteAddress get remote address, the format is like this http://127.0.0.1:8080.
@@ -230,14 +228,15 @@ func (t *TCPConnection) GetRemoteAddress() string {
 
 // GetLocalIP get local ip.
 func (t *TCPConnection) GetLocalIP() string {
-	return strings.Split((*t.socket).LocalAddr().String(), ":")[0]
+	IP, _, _ := net.SplitHostPort((*t.socket).LocalAddr().String())
+	return IP
 }
 
 // GetLocalPort get local port.
 func (t *TCPConnection) GetLocalPort() int {
-	addr := strings.Split((*t.socket).LocalAddr().String(), ":")
-	port, _ := strconv.Atoi(addr[1])
-	return port
+	_, port, _ := net.SplitHostPort((*t.socket).LocalAddr().String())
+	p, _ := strconv.Atoi(port)
+	return p
 }
 
 // GetLocalAddress get remote address, the format is like this http://127.0.0.1:8080.
